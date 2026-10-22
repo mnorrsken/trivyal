@@ -1,0 +1,18 @@
+trivyal is starting. It reads trivy-operator reports, so install trivy-operator
+first if you have not.
+
+{{- if .Values.ingress.enabled }}
+Open:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else }}
+Open it with a port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "trivyal.fullname" . }} 8080:{{ .Values.service.port }}
+  then browse to http://localhost:8080/
+{{- end }}
+{{- if not .Values.auth.oidc.enabled }}
+
+trivyal has no login enabled. Everyone who can reach it can read your
+security reports. Enable auth.oidc or put an authenticating proxy in front.
+{{- end }}

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: trivyal
+description: A web UI for trivy-operator reports, made for small clusters
+type: application
+# Set from the git tag by CI; do not bump by hand.
+version: 0.0.0
+appVersion: "0.0.0"
+keywords:
+  - trivy
+  - trivy-operator
+  - security
+  - vulnerabilities
+  - dashboard
+maintainers:
+  - name: mnorrsken
+home: https://github.com/mnorrsken/trivyal
+sources:
+  - https://github.com/mnorrsken/trivyal

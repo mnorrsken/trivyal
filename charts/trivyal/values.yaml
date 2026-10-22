@@ -1,0 +1,103 @@
+# Default values for trivyal.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mnorrsken/trivyal
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Read-only access to trivy-operator reports and the objects the resource
+# pages show (workloads, pods, nodes, namespaces). Turn off to bring your own.
+rbac:
+  create: true
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: trivyal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: trivyal-tls
+  #    hosts:
+  #      - trivyal.example.com
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+config:
+  # debug, info, warn or error
+  logLevel: info
+
+# Optional login with OpenID Connect. Without it, trivyal has no login of its
+# own: keep it off the internet or put an authenticating proxy in front.
+auth:
+  oidc:
+    enabled: false
+    issuerURL: ""
+    clientID: ""
+    # External URL of the callback, e.g. https://trivyal.example.com/auth/callback
+    redirectURL: ""
+    scopes: "openid profile email"
+    groupsClaim: groups
+    # Only these groups or emails may sign in. Empty allows every user the
+    # provider authenticates.
+    allowedGroups: []
+    allowedEmails: []
+    # Secret with keys "client-secret" and "session-key" (32+ random bytes;
+    # without it sessions end when the pod restarts).
+    existingSecret: ""
+    # Lab use only: create the secret from these values.
+    clientSecret: ""
+    sessionKey: ""
+
+metrics:
+  enabled: false
+  port: 9090
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}

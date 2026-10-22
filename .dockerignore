@@ -1,0 +1,7 @@
+.git
+bin
+dist
+web/node_modules
+web/.svelte-kit
+internal/web/dist/app
+charts

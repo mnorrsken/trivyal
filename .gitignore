@@ -1,0 +1,7 @@
+/bin/
+/dist/
+/internal/web/dist/app/
+.DS_Store
+*.test
+*.out
+/dev/lab.kubeconfig
