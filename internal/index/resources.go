@@ -57,7 +57,7 @@ func (s *Snapshot) WorkloadStats() map[string]*WorkloadStat {
 		}
 		get(r.Resource.Resource).Config.Inc(r.C.Severity)
 	}
-	for _, r := range s.Secrets {
+	for _, r := range UniqueSecrets(s.Secrets) {
 		if !r.Scan.Workload.Stale {
 			get(r.Scan.Workload.Resource).Secrets++
 		}
@@ -133,7 +133,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 			addRef(sc.Report)
 		}
 	}
-	for _, r := range s.Secrets {
+	for _, r := range UniqueSecrets(s.Secrets) {
 		if sameWorkload(r.Scan.Workload, res) {
 			out.Secrets = append(out.Secrets, SecretFindings([]*SecretRow{r})...)
 		}

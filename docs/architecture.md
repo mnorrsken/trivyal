@@ -35,8 +35,9 @@ flowchart LR
 
 ## Counting rules
 
-- A vulnerability is counted once per image (digest), however many
-  workloads run the image; namespace totals likewise once per namespace.
+- A vulnerability or exposed secret is counted once per image (digest),
+  however many workloads run the image; namespace totals likewise once per
+  namespace, workload pages once per workload.
 - When several reports cover one resource (a report per pod of a custom
   resource, or two ReplicaSets during a rollout), only the newest report's
   checks count. The same check on two containers is two findings.

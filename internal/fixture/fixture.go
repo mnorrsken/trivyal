@@ -169,6 +169,17 @@ func New(t testing.TB) *Source {
 	clean["report"] = map[string]any{"artifact": map[string]any{"repository": "demo/tools", "digest": "sha256:bbb"}, "summary": map[string]any{}, "secrets": []any{}}
 	add(reports.ExposedSecretReports, clean)
 
+	// Both database pods report the same key in the same image.
+	for _, pod := range []string{"db-1", "db-2"} {
+		dbs := meta("ExposedSecretReport", "shop", "pod-"+pod+"-postgres", "Pod", pod, "postgres")
+		dbs["report"] = map[string]any{
+			"artifact": map[string]any{"repository": "shop/db", "tag": "16", "digest": "sha256:ccc"},
+			"summary":  map[string]any{"mediumCount": 1},
+			"secrets":  []any{map[string]any{"ruleID": "jwt-token", "title": "JWT token", "category": "JWT", "severity": "MEDIUM", "target": "/srv/test.jwt", "match": "****"}},
+		}
+		add(reports.ExposedSecretReports, dbs)
+	}
+
 	sbom := meta("SbomReport", "shop", "replicaset-web-new-web", "ReplicaSet", "web-new", "web")
 	sbom["report"] = map[string]any{
 		"registry": map[string]any{"server": "registry.example.com"},

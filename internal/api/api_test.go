@@ -130,7 +130,7 @@ func TestLists(t *testing.T) {
 		{"/api/v1/checks/config", 3, "resource"},
 		{"/api/v1/checks/config?group=check", 4, "check"},
 		{"/api/v1/checks/rbac?group=finding", 1, "finding"},
-		{"/api/v1/secrets", 1, "finding"},
+		{"/api/v1/secrets", 2, "finding"},
 		{"/api/v1/sbom", 2, "component"},
 		{"/api/v1/sbom?group=image&q=name:zlib", 1, "image"},
 		{"/api/v1/workloads?q=sev:critical", 1, "workload"},

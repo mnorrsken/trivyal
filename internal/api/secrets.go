@@ -22,7 +22,7 @@ func (s *Server) secrets(w http.ResponseWriter, r *http.Request) {
 	}
 	snap := s.snapshot()
 	rows, all, m := snap.MatchSecrets(p.q, p.stale)
-	f := index.SecretFindings(rows)
+	f := index.SecretFindings(index.UniqueSecrets(rows))
 	res := SecretList{List: List{Page: p.page, Size: p.size, Group: "finding", Rows: len(rows), Total: len(f), Facets: m.Facets(all, index.SecretFacets, 50)}}
 	res.Items, res.Sort = page(f, p.sort, "severity", index.SecretSorts, p)
 	for _, sc := range snap.SecretScans {

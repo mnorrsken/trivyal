@@ -72,7 +72,7 @@
 		<StatTile
 			label="Exposed secrets"
 			value={compact(total(s.secrets.counts))}
-			note="{int(s.secrets.affected)} of {int(s.secrets.scanned)} containers affected"
+			note="in {int(s.secrets.affected)} workloads · {int(s.secrets.scanned)} containers scanned"
 			href="/secrets"
 		/>
 		<StatTile

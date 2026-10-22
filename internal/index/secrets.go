@@ -65,6 +65,26 @@ func (r *SecretRow) Field(name string) []string {
 
 func (r *SecretRow) Text() string { return r.text }
 
+// Key identifies a secret in an image, so a secret is counted once per
+// image like a vulnerability, however many pods run the image.
+func (r *SecretRow) Key() string {
+	return r.Scan.ImageKey + "|" + r.S.RuleID + "|" + r.S.Target + "|" + r.S.Match
+}
+
+// UniqueSecrets keeps one row per workload and secret (pods of one
+// workload run the same image and report the same secret).
+func UniqueSecrets(rows []*SecretRow) []*SecretRow {
+	seen := make(map[string]bool, len(rows))
+	out := rows[:0:0]
+	for _, r := range rows {
+		if k := r.Scan.Workload.String() + "|" + r.Key(); !seen[k] {
+			seen[k] = true
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func (s *Snapshot) addSecrets(kind string, r *reports.ExposedSecretReport, w Workload) {
 	scan := &SecretScan{
 		Workload: w, Container: r.Container,

@@ -172,13 +172,20 @@ func (s *Snapshot) Summary() *Summary {
 			affected[sc.Workload.String()] = true
 		}
 	}
+	seenSecret := map[string]bool{}
 	for _, r := range s.Secrets {
 		if r.Scan.Workload.Stale {
 			continue
 		}
-		sum.Secrets.Counts.Inc(r.S.Severity)
-		if n := ns(r.Scan.Workload.Namespace); n != nil {
-			n.Secrets++
+		if k := r.Key(); !seenSecret[k] {
+			seenSecret[k] = true
+			sum.Secrets.Counts.Inc(r.S.Severity)
+		}
+		if k := r.Scan.Workload.Namespace + "|" + r.Key(); !seenSecret[k] {
+			seenSecret[k] = true
+			if n := ns(r.Scan.Workload.Namespace); n != nil {
+				n.Secrets++
+			}
 		}
 	}
 	sum.Secrets.Affected = len(affected)

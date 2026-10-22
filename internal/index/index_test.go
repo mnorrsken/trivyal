@@ -122,7 +122,8 @@ func TestSummary(t *testing.T) {
 	if sum.RBAC.Counts.Critical != 1 {
 		t.Errorf("rbac summary = %+v", sum.RBAC)
 	}
-	if sum.Secrets.Scanned != 2 || sum.Secrets.Affected != 1 {
+	wantSecrets := reports.SeveritySummary{High: 1, Medium: 1}
+	if sum.Secrets.Scanned != 4 || sum.Secrets.Affected != 2 || sum.Secrets.Counts != wantSecrets {
 		t.Errorf("secrets summary = %+v", sum.Secrets)
 	}
 	if len(sum.Compliance) != 1 || sum.Compliance[0].Pass != 1 {
@@ -181,8 +182,12 @@ func TestForWorkload(t *testing.T) {
 		t.Errorf("config %d secrets %d, want 3 and 1", len(w.Config), len(w.Secrets))
 	}
 	db := s.ForWorkload(reports.Resource{Kind: "Cluster", Namespace: "shop", Name: "db"})
-	if len(db.Images) != 1 || len(db.Reports) != 4 || len(db.Config) != 1 {
-		t.Errorf("custom resource workload: %d images, %d reports, %d config, want 1, 4, 1", len(db.Images), len(db.Reports), len(db.Config))
+	if len(db.Images) != 1 || len(db.Reports) != 6 || len(db.Config) != 1 || len(db.Secrets) != 1 {
+		t.Errorf("custom resource workload: %d images, %d reports, %d config, %d secrets, want 1, 6, 1, 1",
+			len(db.Images), len(db.Reports), len(db.Config), len(db.Secrets))
+	}
+	if st := s.WorkloadStats()["shop/Cluster/db"]; st == nil || st.Secrets != 1 {
+		t.Errorf("db stats = %+v, want 1 secret", st)
 	}
 	st := s.WorkloadStats()["shop/Deployment/web"]
 	if st == nil || st.Vulns.Critical != 1 || st.Secrets != 1 {
