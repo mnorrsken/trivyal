@@ -22,6 +22,7 @@ func (fakeBackend) Workloads() []kube.WorkloadInfo {
 	return []kube.WorkloadInfo{
 		{Resource: reports.Resource{Kind: "Deployment", Namespace: "shop", Name: "web"}, Containers: []kube.Container{{Name: "web", Image: "registry.example.com/shop/web:1.0"}}},
 		{Resource: reports.Resource{Kind: "Deployment", Namespace: "shop", Name: "quiet"}},
+		{Resource: reports.Resource{Kind: "Cluster", Namespace: "shop", Name: "db"}},
 	}
 }
 
@@ -121,13 +122,13 @@ func TestLists(t *testing.T) {
 		total int
 		group string
 	}{
-		{"/api/v1/vulnerabilities", 2, "image"},
-		{"/api/v1/vulnerabilities?group=workload", 3, "workload"},
+		{"/api/v1/vulnerabilities", 4, "image"},
+		{"/api/v1/vulnerabilities?group=workload", 5, "workload"},
 		{"/api/v1/vulnerabilities?group=cve&q=sev:critical", 1, "cve"},
-		{"/api/v1/vulnerabilities?group=finding&stale=1", 6, "finding"},
-		{"/api/v1/vulnerabilities?group=nonsense", 2, "image"},
-		{"/api/v1/checks/config", 2, "resource"},
-		{"/api/v1/checks/config?group=check", 3, "check"},
+		{"/api/v1/vulnerabilities?group=finding&stale=1", 8, "finding"},
+		{"/api/v1/vulnerabilities?group=nonsense", 4, "image"},
+		{"/api/v1/checks/config", 3, "resource"},
+		{"/api/v1/checks/config?group=check", 4, "check"},
 		{"/api/v1/checks/rbac?group=finding", 1, "finding"},
 		{"/api/v1/secrets", 1, "finding"},
 		{"/api/v1/sbom", 2, "component"},
@@ -147,7 +148,7 @@ func TestListPagingAndSort(t *testing.T) {
 	srv := newTestServer(t)
 	var l list
 	get(t, srv, "/api/v1/vulnerabilities?group=finding&size=1&page=2&sort=-severity", http.StatusOK, &l)
-	if l.Total != 5 || len(l.Items) != 1 || l.Sort != "-severity" {
+	if l.Total != 7 || len(l.Items) != 1 || l.Sort != "-severity" {
 		t.Errorf("paging: %+v", l)
 	}
 	get(t, srv, "/api/v1/vulnerabilities?group=finding&page=99", http.StatusOK, &l)
@@ -227,7 +228,8 @@ func TestResources(t *testing.T) {
 
 	var nd NamespaceDetail
 	get(t, srv, "/api/v1/namespace/shop", http.StatusOK, &nd)
-	if nd.Workloads != 2 || len(nd.Config) != 1 || nd.Config[0].Resource.Kind != "Service" {
+	// web and api run the same image: its critical counts once.
+	if nd.Workloads != 3 || nd.Vulns.Critical != 1 || len(nd.Config) != 1 || nd.Config[0].Resource.Kind != "Service" {
 		t.Errorf("namespace detail: workloads %d, config %+v", nd.Workloads, nd.Config)
 	}
 	var node NodeDetail
@@ -250,7 +252,7 @@ func TestSummaryAndHealth(t *testing.T) {
 		Synced bool `json:"synced"`
 	}
 	get(t, srv, "/api/v1/summary", http.StatusOK, &s)
-	if !s.Synced || s.Vulns.Images != 2 {
+	if !s.Synced || s.Vulns.Images != 4 {
 		t.Errorf("summary = %+v", s)
 	}
 	get(t, srv, "/healthz", http.StatusOK, nil)

@@ -23,8 +23,9 @@ flowchart LR
 2. Every informer event marks the index stale and schedules a debounced
    Server-Sent Event. `internal/index` rebuilds one immutable snapshot on
    the next request: rows per finding, images keyed by digest, owner
-   resolution (ReplicaSet → Deployment, Job → CronJob) and the stale flag
-   for ReplicaSets scaled to zero.
+   resolution (ReplicaSet → Deployment, Job → CronJob, a pod reported on
+   its own → the custom resource that controls it, such as an operator's
+   database cluster) and the stale flag for ReplicaSets scaled to zero.
 3. `internal/query` parses the filter language. Each list endpoint matches
    rows, computes facet counts (each facet ignores its own term), groups,
    sorts and pages on the server, so the browser never gets thousands of
@@ -35,7 +36,10 @@ flowchart LR
 ## Counting rules
 
 - A vulnerability is counted once per image (digest), however many
-  workloads run the image. Workload and namespace pages count per workload.
+  workloads run the image; namespace totals likewise once per namespace.
+- When several reports cover one resource (a report per pod of a custom
+  resource, or two ReplicaSets during a rollout), only the newest report's
+  checks count. The same check on two containers is two findings.
 - Old ReplicaSet revisions are hidden everywhere unless `stale=1` (the
   "Include old ReplicaSets" box).
 - trivy-operator often records only failed checks

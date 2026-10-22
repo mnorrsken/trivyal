@@ -28,7 +28,8 @@ func TestOwnerResolution(t *testing.T) {
 	for _, r := range s.Vulns {
 		got[r.Use.Workload.String()+map[bool]string{true: " stale", false: ""}[r.Use.Workload.Stale]] = true
 	}
-	for _, want := range []string{"shop/Deployment/web", "shop/Deployment/web stale", "shop/Deployment/api", "demo/CronJob/backup"} {
+	for _, want := range []string{"shop/Deployment/web", "shop/Deployment/web stale", "shop/Deployment/api", "demo/CronJob/backup",
+		"shop/Cluster/db", "kube-system/Pod/etcd-node-a"} {
 		if !got[want] {
 			t.Errorf("missing workload %q in %v", want, got)
 		}
@@ -49,8 +50,8 @@ func TestImageDedupe(t *testing.T) {
 	}
 	rows, _, _ := s.MatchVulns(query.Query{}, false)
 	groups := GroupByImage(rows)
-	if len(groups) != 2 {
-		t.Fatalf("images = %d, want 2 (stale image hidden)", len(groups))
+	if len(groups) != 4 {
+		t.Fatalf("images = %d, want 4 (stale image hidden)", len(groups))
 	}
 	for _, g := range groups {
 		if g.Key == "sha256:aaa" && g.Counts.Total() != 3 {
@@ -104,16 +105,18 @@ func TestGroupings(t *testing.T) {
 func TestSummary(t *testing.T) {
 	sum := snapshot(t).Summary()
 	want := reports.SeveritySummary{Critical: 2, High: 1, Medium: 1, Low: 1}
+	want.Medium++ // db image
+	want.Low++    // etcd image
 	if sum.Vulns.Counts != want {
 		t.Errorf("vuln counts = %+v, want %+v", sum.Vulns.Counts, want)
 	}
-	if sum.Vulns.Images != 2 || sum.Vulns.Workloads != 3 {
-		t.Errorf("images %d workloads %d, want 2 and 3", sum.Vulns.Images, sum.Vulns.Workloads)
+	if sum.Vulns.Images != 4 || sum.Vulns.Workloads != 5 {
+		t.Errorf("images %d workloads %d, want 4 and 5", sum.Vulns.Images, sum.Vulns.Workloads)
 	}
 	if sum.StaleWorkloads != 1 {
 		t.Errorf("stale = %d, want 1", sum.StaleWorkloads)
 	}
-	if sum.Config.Failing != 2 || sum.Config.Counts.High != 1 {
+	if sum.Config.Failing != 3 || sum.Config.Counts.High != 1 || sum.Config.Counts.Medium != 3 {
 		t.Errorf("config summary = %+v", sum.Config)
 	}
 	if sum.RBAC.Counts.Critical != 1 {
@@ -130,11 +133,21 @@ func TestSummary(t *testing.T) {
 func TestChecks(t *testing.T) {
 	s := snapshot(t)
 	rows, _, _ := s.MatchChecks(CheckConfig, mustQuery(t, "kind:Deployment", CheckSchema), false)
-	if len(rows) != 2 {
-		t.Fatalf("config rows for Deployment = %d, want 2", len(rows))
+	if len(rows) != 3 {
+		t.Fatalf("config rows for Deployment = %d, want 3", len(rows))
 	}
-	if g := GroupByCheck(rows); len(g) != 2 || g[0].Failed != 1 {
+	if g := GroupByCheck(rows); len(g) != 2 || g[0].Failed != 1 || g[1].Failed != 2 {
 		t.Errorf("by check = %+v", g)
+	}
+	rows, _, _ = s.MatchChecks(CheckConfig, mustQuery(t, "kind:Cluster", CheckSchema), false)
+	if g := GroupByResource(rows); len(g) != 1 || g[0].Counts.Medium != 1 {
+		t.Errorf("custom resource config groups = %+v, want one group with the check once", g)
+	}
+	if f := Findings(rows); len(f) != 1 {
+		t.Errorf("custom resource findings = %d, want 1", len(f))
+	}
+	if g := GroupByCheck(rows); len(g) != 1 || g[0].Failed != 1 {
+		t.Errorf("by check = %+v, want the resource counted once", g)
 	}
 	if rows, _, _ := s.MatchChecks(CheckRBAC, mustQuery(t, "scope:cluster", CheckSchema), false); len(rows) != 1 {
 		t.Errorf("rbac cluster rows = %d, want 1", len(rows))
@@ -164,8 +177,12 @@ func TestForWorkload(t *testing.T) {
 	if len(w.Images) != 1 || w.Images[0].Key != "sha256:aaa" || !w.Images[0].HasSBOM {
 		t.Errorf("images = %+v (stale image must not show)", w.Images)
 	}
-	if len(w.Config) != 2 || len(w.Secrets) != 1 {
-		t.Errorf("config %d secrets %d, want 2 and 1", len(w.Config), len(w.Secrets))
+	if len(w.Config) != 3 || len(w.Secrets) != 1 {
+		t.Errorf("config %d secrets %d, want 3 and 1", len(w.Config), len(w.Secrets))
+	}
+	db := s.ForWorkload(reports.Resource{Kind: "Cluster", Namespace: "shop", Name: "db"})
+	if len(db.Images) != 1 || len(db.Reports) != 4 || len(db.Config) != 1 {
+		t.Errorf("custom resource workload: %d images, %d reports, %d config, want 1, 4, 1", len(db.Images), len(db.Reports), len(db.Config))
 	}
 	st := s.WorkloadStats()["shop/Deployment/web"]
 	if st == nil || st.Vulns.Critical != 1 || st.Secrets != 1 {

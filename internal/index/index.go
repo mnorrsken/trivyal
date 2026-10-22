@@ -101,16 +101,21 @@ func (r *resolver) workload(res reports.Resource) Workload {
 		return w
 	}
 	w := Workload{Resource: res}
-	switch res.Kind {
-	case "ReplicaSet", "Job":
-		if o, ok := r.src.Owner(res.Kind, res.Namespace, res.Name); ok {
-			if res.Kind == "ReplicaSet" && o.Replicas != nil && *o.Replicas == 0 && o.Kind != "" {
-				w.Stale = true
-			}
-			if o.Kind != "" {
-				w.Kind, w.Name = o.Kind, o.Name
-			}
+	// Follow controllers: ReplicaSet -> Deployment, Job -> CronJob, and a
+	// Pod reported on its own -> the custom resource that owns it (an
+	// operator's database cluster, say). Static pods stay pods.
+	for range 3 {
+		if w.Kind != "ReplicaSet" && w.Kind != "Job" && w.Kind != "Pod" {
+			break
 		}
+		o, ok := r.src.Owner(w.Kind, w.Namespace, w.Name)
+		if !ok || o.Kind == "" || o.Kind == "Node" {
+			break
+		}
+		if w.Kind == "ReplicaSet" && o.Replicas != nil && *o.Replicas == 0 {
+			w.Stale = true
+		}
+		w.Kind, w.Name = o.Kind, o.Name
 	}
 	r.cache[key] = w
 	return w
@@ -177,6 +182,7 @@ func (s *Snapshot) add(kind string, it any, res *resolver) {
 }
 
 func (s *Snapshot) finish() {
+	s.markDuplicateChecks()
 	s.finishSBOM()
 }
 

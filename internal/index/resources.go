@@ -51,7 +51,7 @@ func (s *Snapshot) WorkloadStats() map[string]*WorkloadStat {
 			st.Fixable++
 		}
 	}
-	for _, r := range s.Checks {
+	for _, r := range uniqueChecks(s.Checks) {
 		if r.Type != CheckConfig || r.Resource.Stale || r.C.Success {
 			continue
 		}
@@ -122,7 +122,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 	for _, r := range s.Checks {
 		if r.Type == CheckConfig && sameWorkload(r.Resource, res) {
 			addRef(r.Report)
-			if !r.C.Success {
+			if !r.C.Success && !r.Dup {
 				out.Config = append(out.Config, &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C})
 			}
 		}
@@ -162,7 +162,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 // matching keep, worst first.
 func (s *Snapshot) ChecksFor(typ string, keep func(Workload) bool) []*CheckFinding {
 	out := []*CheckFinding{}
-	for _, r := range s.Checks {
+	for _, r := range uniqueChecks(s.Checks) {
 		if r.Type == typ && !r.C.Success && !r.Resource.Stale && keep(r.Resource) {
 			out = append(out, &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C})
 		}

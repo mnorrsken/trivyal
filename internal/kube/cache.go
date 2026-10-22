@@ -13,6 +13,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -111,6 +112,23 @@ func (c *Cache) Available() ([]string, error) {
 // initial sync. A missing trivy-operator is not an error: the UI shows an
 // empty state, and discovery is retried every minute until CRDs appear.
 func (c *Cache) Start(ctx context.Context) error {
+	if err := c.startCore(ctx); err != nil {
+		return err
+	}
+
+	if err := c.startReports(ctx); err != nil {
+		slog.Warn("trivy-operator reports not available yet", "err", err)
+	}
+	if !c.waitSynced(ctx) {
+		return ctx.Err()
+	}
+	go c.rediscover(ctx)
+	return nil
+}
+
+// startCore starts the informers for core objects (everything but the
+// reports).
+func (c *Cache) startCore(ctx context.Context) error {
 	c.factory = informers.NewSharedInformerFactoryWithOptions(c.core, 30*time.Minute)
 	c.rsInf = c.factory.Apps().V1().ReplicaSets().Informer()
 	c.jobInf = c.factory.Batch().V1().Jobs().Informer()
@@ -126,14 +144,6 @@ func (c *Cache) Start(ctx context.Context) error {
 		return fmt.Errorf("watching cluster objects: %w", err)
 	}
 	c.factory.Start(ctx.Done())
-
-	if err := c.startReports(ctx); err != nil {
-		slog.Warn("trivy-operator reports not available yet", "err", err)
-	}
-	if !c.waitSynced(ctx) {
-		return ctx.Err()
-	}
-	go c.rediscover(ctx)
 	return nil
 }
 
@@ -318,8 +328,9 @@ func (c *Cache) Installed() bool {
 	return len(c.informers) > 0
 }
 
-// Owner returns the controller owner and replica count of a ReplicaSet or
-// Job. ok is false when the object is not in the cache.
+// Owner returns the controller owner of a ReplicaSet, Job or Pod, and the
+// replica count of a ReplicaSet. ok is false when the object is not in the
+// cache.
 func (c *Cache) Owner(kind, namespace, name string) (reports.Owner, bool) {
 	var inf cache.SharedIndexInformer
 	switch kind {
@@ -327,6 +338,8 @@ func (c *Cache) Owner(kind, namespace, name string) (reports.Owner, bool) {
 		inf = c.rsInf
 	case "Job":
 		inf = c.jobInf
+	case "Pod":
+		inf = c.objInf["Pod"]
 	default:
 		return reports.Owner{}, false
 	}
@@ -344,6 +357,8 @@ func (c *Cache) Owner(kind, namespace, name string) (reports.Owner, bool) {
 		o.Replicas = v.Spec.Replicas
 		refs = v.OwnerReferences
 	case *batchv1.Job:
+		refs = v.OwnerReferences
+	case *corev1.Pod:
 		refs = v.OwnerReferences
 	}
 	for _, r := range refs {

@@ -129,6 +129,10 @@ func (s *Snapshot) Summary() *Summary {
 	for _, r := range s.Checks {
 		if r.Resource.Stale {
 			stale[r.Resource.String()] = true
+		}
+	}
+	for _, r := range uniqueChecks(s.Checks) {
+		if r.Resource.Stale {
 			continue
 		}
 		var cs *CheckSummary

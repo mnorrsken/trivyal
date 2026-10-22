@@ -64,16 +64,36 @@ export function splitImage(ref: string): { repo: string; tag: string } {
 	return { repo: ref, tag: '' };
 }
 
-const workloadKinds = new Set(['Deployment', 'StatefulSet', 'DaemonSet', 'CronJob', 'Job', 'Pod', 'ReplicaSet']);
+// Kinds that only have config or RBAC findings; everything else (built-in
+// workloads, pods, custom resources that own pods) has a workload page.
+const findingKinds = new Set([
+	'Service',
+	'Ingress',
+	'PersistentVolumeClaim',
+	'NetworkPolicy',
+	'ConfigMap',
+	'Secret',
+	'ServiceAccount',
+	'Role',
+	'ClusterRole',
+	'RoleBinding',
+	'ClusterRoleBinding',
+	'LimitRange',
+	'ResourceQuota',
+	'PodDisruptionBudget',
+	'HorizontalPodAutoscaler',
+	'CustomResourceDefinition',
+	'Namespace'
+]);
 
 /**
- * Where a resource links: workloads and nodes have pages; other resources
- * (services, roles...) link to their findings.
+ * Where a resource links: workloads (built-in or custom resources that own
+ * pods) and nodes have pages; other resources link to their findings.
  */
 export function workloadHref(w: Resource): string {
 	if (w.kind === 'Node') return '/node/' + encodeURIComponent(w.name);
-	if (!workloadKinds.has(w.kind)) {
-		const type = w.kind === 'Role' || w.kind === 'ClusterRole' ? 'rbac' : 'config';
+	if (findingKinds.has(w.kind)) {
+		const type = w.kind.endsWith('Role') || w.kind.endsWith('RoleBinding') ? 'rbac' : 'config';
 		const q = `kind:${w.kind}` + (w.namespace ? ` ns:${w.namespace}` : '') + ` resource:=${w.name}`;
 		return `/checks/${type}` + qs({ q, group: 'finding' });
 	}

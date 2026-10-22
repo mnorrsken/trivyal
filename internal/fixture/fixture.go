@@ -106,16 +106,21 @@ func parse(t testing.TB, resource string, obj map[string]any) any {
 //	shop/Deployment web  -> ReplicaSet web-old (0 replicas, stale), image web:0.9
 //	shop/Deployment api  -> ReplicaSet api-1, also image web:1.0 (same digest)
 //	demo/CronJob backup  -> Job backup-1, image tools:2
+//	shop/Cluster db      -> Pods db-1, db-2 (custom resource owner), image db:16
+//	kube-system/Pod etcd-node-a, a static pod owned by its Node
 func New(t testing.TB) *Source {
 	t.Helper()
 	three, zero := int32(3), int32(0)
 	src := &Source{
 		objs: map[string][]any{},
 		owners: map[string]reports.Owner{
-			"ReplicaSet/shop/web-new": {Kind: "Deployment", Name: "web", Replicas: &three},
-			"ReplicaSet/shop/web-old": {Kind: "Deployment", Name: "web", Replicas: &zero},
-			"ReplicaSet/shop/api-1":   {Kind: "Deployment", Name: "api", Replicas: &three},
-			"Job/demo/backup-1":       {Kind: "CronJob", Name: "backup"},
+			"ReplicaSet/shop/web-new":     {Kind: "Deployment", Name: "web", Replicas: &three},
+			"ReplicaSet/shop/web-old":     {Kind: "Deployment", Name: "web", Replicas: &zero},
+			"ReplicaSet/shop/api-1":       {Kind: "Deployment", Name: "api", Replicas: &three},
+			"Job/demo/backup-1":           {Kind: "CronJob", Name: "backup"},
+			"Pod/shop/db-1":               {Kind: "Cluster", Name: "db"},
+			"Pod/shop/db-2":               {Kind: "Cluster", Name: "db"},
+			"Pod/kube-system/etcd-node-a": {Kind: "Node", Name: "node-a"},
 		},
 	}
 	add := func(res string, obj map[string]any) { src.objs[res] = append(src.objs[res], parse(t, res, obj)) }
@@ -133,8 +138,20 @@ func New(t testing.TB) *Source {
 		vuln("CVE-2024-0001", "CRITICAL", "openssl", "3.0.1", "3.0.13"),
 		vuln("GHSA-xxxx", "MEDIUM", "lodash", "4.17.0", "")))
 
+	for _, pod := range []string{"db-1", "db-2"} {
+		add(reports.VulnerabilityReports, vulnReport("shop", "pod-"+pod+"-postgres", "Pod", pod, "postgres", "shop/db", "16", "sha256:ccc",
+			vuln("CVE-2024-0004", "MEDIUM", "libpq", "16.0", "16.1")))
+	}
+	add(reports.VulnerabilityReports, vulnReport("kube-system", "pod-etcd-node-a-etcd", "Pod", "etcd-node-a", "etcd", "etcd", "3.5", "sha256:ddd",
+		vuln("CVE-2024-0005", "LOW", "etcd", "3.5.0", "")))
+
 	add(reports.ConfigAuditReports, checkReport("ConfigAuditReport", "shop", "replicaset-web-new", "ReplicaSet", "web-new",
-		check("AVD-KSV-0014", "HIGH"), check("AVD-KSV-0012", "MEDIUM")))
+		// Same check for two containers: two findings.
+		check("AVD-KSV-0014", "HIGH"), check("AVD-KSV-0012", "MEDIUM"), check("AVD-KSV-0012", "MEDIUM")))
+	// One config audit report per database pod, with the same finding.
+	for _, pod := range []string{"db-1", "db-2"} {
+		add(reports.ConfigAuditReports, checkReport("ConfigAuditReport", "shop", "pod-"+pod, "Pod", pod, check("AVD-KSV-0001", "MEDIUM")))
+	}
 	add(reports.ConfigAuditReports, checkReport("ConfigAuditReport", "shop", "service-web", "Service", "web",
 		check("AVD-KSV-0117", "LOW")))
 	add(reports.ClusterRbacAssessmentReports, checkReport("ClusterRbacAssessmentReport", "", "clusterrole-admin", "ClusterRole", "admin",

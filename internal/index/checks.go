@@ -2,6 +2,7 @@ package index
 
 import (
 	"cmp"
+	"time"
 
 	"github.com/mnorrsken/trivyal/internal/query"
 	"github.com/mnorrsken/trivyal/internal/reports"
@@ -34,7 +35,12 @@ type CheckRow struct {
 	Resource Workload
 	Report   ReportRef
 	C        *reports.Check
-	text     string
+	// Dup is set when a newer report covers the same resource: one report
+	// per pod of a custom resource, or two ReplicaSets during a rollout.
+	// Only the newest report counts.
+	Dup     bool
+	updated time.Time
+	text    string
 }
 
 // CheckSchema lists the filters for config audit, RBAC and infra checks.
@@ -85,13 +91,46 @@ func (r *CheckRow) Field(name string) []string {
 
 func (r *CheckRow) Text() string { return r.text }
 
+// uniqueChecks drops rows of reports that a newer report of the same
+// resource replaces.
+func uniqueChecks(rows []*CheckRow) []*CheckRow {
+	out := rows[:0:0]
+	for _, r := range rows {
+		if !r.Dup {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// markDuplicateChecks sets Dup on rows from all but the newest report of
+// each resource.
+func (s *Snapshot) markDuplicateChecks() {
+	type best struct {
+		report  ReportRef
+		updated time.Time
+	}
+	newest := map[string]best{}
+	key := func(r *CheckRow) string { return r.Type + "|" + r.Resource.String() + "|" + yesNo(r.Resource.Stale) }
+	for _, r := range s.Checks {
+		k := key(r)
+		b, ok := newest[k]
+		if !ok || r.updated.After(b.updated) || (r.updated.Equal(b.updated) && r.Report.Name < b.report.Name) {
+			newest[k] = best{r.Report, r.updated}
+		}
+	}
+	for _, r := range s.Checks {
+		r.Dup = newest[key(r)].report != r.Report
+	}
+}
+
 func (s *Snapshot) addChecks(kind string, r *reports.CheckReport, w Workload) {
 	typ := CheckType(kind)
 	ref := ReportRef{kind, r.Namespace, r.Name}
 	for i := range r.Checks {
 		c := &r.Checks[i]
 		s.Checks = append(s.Checks, &CheckRow{
-			Type: typ, Cluster: !reports.Namespaced(kind), Resource: w, Report: ref, C: c,
+			Type: typ, Cluster: !reports.Namespaced(kind), Resource: w, Report: ref, C: c, updated: r.Updated,
 			text: lower(c.ID, c.Title, c.Category, w.Kind, w.Namespace, w.Name),
 		})
 	}
@@ -103,7 +142,7 @@ func (s *Snapshot) MatchChecks(typ string, q query.Query, withStale bool) ([]*Ch
 	var out []*CheckRow
 	var all []query.Row
 	for _, r := range s.Checks {
-		if r.Type != typ || (r.Resource.Stale && !withStale) {
+		if r.Type != typ || r.Dup || (r.Resource.Stale && !withStale) {
 			continue
 		}
 		all = append(all, r)
@@ -126,8 +165,8 @@ type ResourceGroup struct {
 func GroupByResource(rows []*CheckRow) []*ResourceGroup {
 	groups := map[string]*ResourceGroup{}
 	var order []*ResourceGroup
-	for _, r := range rows {
-		k := r.Resource.String() + "|" + r.Report.Name
+	for _, r := range uniqueChecks(rows) {
+		k := r.Resource.String()
 		g := groups[k]
 		if g == nil {
 			g = &ResourceGroup{Resource: r.Resource, Report: r.Report}
@@ -159,7 +198,7 @@ type CheckGroup struct {
 func GroupByCheck(rows []*CheckRow) []*CheckGroup {
 	groups := map[string]*CheckGroup{}
 	var order []*CheckGroup
-	for _, r := range rows {
+	for _, r := range uniqueChecks(rows) {
 		g := groups[r.C.ID]
 		if g == nil {
 			c := r.C
@@ -183,8 +222,9 @@ type CheckFinding struct {
 	Check    *reports.Check `json:"check"`
 }
 
-// Findings flattens check rows.
+// Findings flattens check rows, one per check and resource.
 func Findings(rows []*CheckRow) []*CheckFinding {
+	rows = uniqueChecks(rows)
 	out := make([]*CheckFinding, len(rows))
 	for i, r := range rows {
 		out[i] = &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C}

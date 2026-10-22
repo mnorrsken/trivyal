@@ -232,15 +232,17 @@ func (s *Server) namespaceRows() []*NamespaceRow {
 		byName[ns.Name] = row
 		out = append(out, row)
 	}
-	for _, w := range s.workloadRows() {
-		row := byName[w.Namespace]
-		if row == nil {
-			continue
+	for _, w := range s.cluster.Workloads() {
+		if row := byName[w.Namespace]; row != nil {
+			row.Workloads++
 		}
-		row.Workloads++
-		row.Vulns.Add(w.Stats.Vulns)
-		row.Config.Add(w.Stats.Config)
-		row.Secrets += w.Stats.Secrets
+	}
+	// Totals count each image's finding once per namespace, the same way
+	// the dashboard does.
+	for _, n := range s.snapshot().Summary().Namespaces {
+		if row := byName[n.Namespace]; row != nil {
+			row.Vulns, row.Config, row.Secrets = n.Vulns, n.Config, n.Secrets
+		}
 	}
 	return out
 }
@@ -253,8 +255,7 @@ func (s *Server) namespaces(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, rows)
 }
 
-// NamespaceDetail is the namespace page. Vulnerability totals are summed
-// per workload, so an image shared by two workloads counts twice.
+// NamespaceDetail is the namespace page.
 type NamespaceDetail struct {
 	*NamespaceRow
 	WorkloadList []*WorkloadRow        `json:"workloadList"`
@@ -275,18 +276,22 @@ func (s *Server) namespace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := NamespaceDetail{NamespaceRow: row, WorkloadList: []*WorkloadRow{}}
+	// Workload misconfigurations are on the workload rows; list the other
+	// resources (services, ingresses, PVCs...) here.
+	isWorkload := map[string]bool{}
 	for _, wr := range s.workloadRows() {
 		if wr.Namespace == name {
 			d.WorkloadList = append(d.WorkloadList, wr)
+			isWorkload[wr.String()] = true
 		}
 	}
 	slices.SortStableFunc(d.WorkloadList, workloadSorts["severity"])
 	snap := s.snapshot()
 	inNS := func(w index.Workload) bool { return w.Namespace == name }
-	// Workload misconfigurations are on the workload rows; list the other
-	// resources (services, ingresses, PVCs...) here.
-	isWorkload := map[string]bool{"Deployment": true, "StatefulSet": true, "DaemonSet": true, "CronJob": true, "Pod": true, "ReplicaSet": true, "Job": true}
-	d.Config = snap.ChecksFor(index.CheckConfig, func(w index.Workload) bool { return inNS(w) && !isWorkload[w.Kind] })
+	podLike := map[string]bool{"Pod": true, "ReplicaSet": true, "Job": true}
+	d.Config = snap.ChecksFor(index.CheckConfig, func(w index.Workload) bool {
+		return inNS(w) && !isWorkload[w.String()] && !podLike[w.Kind]
+	})
 	d.RBAC = snap.ChecksFor(index.CheckRBAC, inNS)
 	writeJSON(w, d)
 }

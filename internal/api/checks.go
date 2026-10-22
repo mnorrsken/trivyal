@@ -66,7 +66,7 @@ func (s *Server) check(w http.ResponseWriter, r *http.Request) {
 	snap := s.snapshot()
 	var d CheckDetail
 	for _, row := range snap.Checks {
-		if row.Type != typ || !strings.EqualFold(row.C.ID, id) {
+		if row.Type != typ || !strings.EqualFold(row.C.ID, id) || row.Resource.Stale || row.Dup {
 			continue
 		}
 		if d.Check == nil {

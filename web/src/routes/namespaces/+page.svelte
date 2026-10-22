@@ -24,7 +24,7 @@
 <div class="head">
 	<div>
 		<h1>Namespaces</h1>
-		<p class="muted sub">Vulnerability totals add up each workload's images.</p>
+		<p class="muted sub">A vulnerability counts once per image, even when several workloads in the namespace run it.</p>
 	</div>
 	<input placeholder="Filter namespaces" bind:value={text} />
 </div>

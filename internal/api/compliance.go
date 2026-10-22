@@ -76,7 +76,7 @@ func (s *Server) complianceControl(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, row := range snap.Checks {
 		id := strings.ToUpper(row.C.ID)
-		if !want[id] || row.Resource.Stale {
+		if !want[id] || row.Resource.Stale || row.Dup {
 			continue
 		}
 		if d.Checks[id] == nil {

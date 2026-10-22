@@ -255,25 +255,48 @@ func controller(refs []metav1.OwnerReference) *metav1.OwnerReference {
 }
 
 // TopOwner follows controller owners through ReplicaSets and Jobs to the
-// workload a user manages. Pods owned by custom resources stay pods, the
-// same way trivy-operator reports them.
+// object a user manages: a Deployment, CronJob, StatefulSet, DaemonSet or a
+// custom resource such as an operator's database cluster. Static pods
+// (owned by their Node) and bare pods are their own top owner.
 func (c *Cache) TopOwner(namespace string, refs []metav1.OwnerReference, self reports.Resource) reports.Resource {
 	ref := controller(refs)
-	if ref == nil {
+	if ref == nil || ref.Kind == "Node" {
 		return self
 	}
-	switch ref.Kind {
-	case "ReplicaSet", "Job":
+	if ref.Kind == "ReplicaSet" || ref.Kind == "Job" {
 		if o, ok := c.Owner(ref.Kind, namespace, ref.Name); ok && o.Kind != "" {
-			if o.Kind == "Deployment" || o.Kind == "CronJob" {
-				return reports.Resource{Kind: o.Kind, Namespace: namespace, Name: o.Name}
-			}
+			return reports.Resource{Kind: o.Kind, Namespace: namespace, Name: o.Name}
 		}
-		return reports.Resource{Kind: ref.Kind, Namespace: namespace, Name: ref.Name}
-	case "StatefulSet", "DaemonSet", "Deployment", "CronJob":
-		return reports.Resource{Kind: ref.Kind, Namespace: namespace, Name: ref.Name}
 	}
-	return self
+	return reports.Resource{Kind: ref.Kind, Namespace: namespace, Name: ref.Name}
+}
+
+// builtinWorkloads are the kinds read from their own informers; other top
+// owners are put together from their pods.
+var builtinWorkloads = []string{"Deployment", "StatefulSet", "DaemonSet", "CronJob"}
+
+// ownedWorkload sums up the pods of a top owner without an informer of its
+// own (custom resources, bare Jobs).
+func ownedWorkload(res reports.Resource, pods []*corev1.Pod) WorkloadInfo {
+	w := WorkloadInfo{Resource: res}
+	n := int32(len(pods))
+	w.Replicas = &n
+	for _, p := range pods {
+		if w.Created.IsZero() || p.CreationTimestamp.Before(&metav1.Time{Time: w.Created}) {
+			w.Created = p.CreationTimestamp.Time
+		}
+		ready := len(p.Status.ContainerStatuses) > 0
+		for _, s := range p.Status.ContainerStatuses {
+			ready = ready && s.Ready
+		}
+		if ready {
+			w.Ready++
+		}
+	}
+	first := pods[0]
+	w.Containers = containers(first.Spec)
+	w.ServiceAccount, w.HostNetwork, w.HostPID = first.Spec.ServiceAccountName, first.Spec.HostNetwork, first.Spec.HostPID
+	return w
 }
 
 func workloadInfo(o any) (WorkloadInfo, bool) {
@@ -331,36 +354,57 @@ func workloadInfo(o any) (WorkloadInfo, bool) {
 	return w, true
 }
 
-// Workload returns one workload. Kind Pod also finds pods that are not
-// top-level (the UI links pods by their own name).
+// Workload returns one workload: a built-in kind, a pod, or a top owner
+// put together from its pods.
 func (c *Cache) Workload(kind, namespace, name string) (WorkloadInfo, bool) {
-	o, ok := c.object(kind, namespace, name)
-	if !ok {
+	if slices.Contains(builtinWorkloads, kind) || kind == "Pod" {
+		o, ok := c.object(kind, namespace, name)
+		if !ok {
+			return WorkloadInfo{}, false
+		}
+		return workloadInfo(o)
+	}
+	res := reports.Resource{Kind: kind, Namespace: namespace, Name: name}
+	var pods []*corev1.Pod
+	for _, o := range c.objects("Pod") {
+		p := o.(*corev1.Pod)
+		if p.Namespace == namespace && c.TopOwner(p.Namespace, p.OwnerReferences, reports.Resource{}) == res {
+			pods = append(pods, p)
+		}
+	}
+	if len(pods) == 0 {
 		return WorkloadInfo{}, false
 	}
-	return workloadInfo(o)
+	return ownedWorkload(res, pods), true
 }
 
 // Workloads lists the top-level workloads: Deployments, StatefulSets,
-// DaemonSets, CronJobs and pods without a built-in controller.
+// DaemonSets, CronJobs, other top owners of pods, and bare pods.
 func (c *Cache) Workloads() []WorkloadInfo {
 	var out []WorkloadInfo
-	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet", "CronJob"} {
+	for _, kind := range builtinWorkloads {
 		for _, o := range c.objects(kind) {
 			if w, ok := workloadInfo(o); ok {
 				out = append(out, w)
 			}
 		}
 	}
+	owned := map[reports.Resource][]*corev1.Pod{}
 	for _, o := range c.objects("Pod") {
 		p := o.(*corev1.Pod)
 		self := reports.Resource{Kind: "Pod", Namespace: p.Namespace, Name: p.Name}
-		if c.TopOwner(p.Namespace, p.OwnerReferences, self) != self {
-			continue
+		top := c.TopOwner(p.Namespace, p.OwnerReferences, self)
+		switch {
+		case top == self:
+			if w, ok := workloadInfo(p); ok {
+				out = append(out, w)
+			}
+		case !slices.Contains(builtinWorkloads, top.Kind):
+			owned[top] = append(owned[top], p)
 		}
-		if w, ok := workloadInfo(p); ok {
-			out = append(out, w)
-		}
+	}
+	for res, pods := range owned {
+		out = append(out, ownedWorkload(res, pods))
 	}
 	slices.SortFunc(out, func(a, b WorkloadInfo) int {
 		return cmp.Or(cmp.Compare(a.Namespace, b.Namespace), cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name))
