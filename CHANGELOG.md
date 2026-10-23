@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
 ### Added
 
 - Hide what you have handled: an image (all tags), a CVE in one image or
