@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-23
+
+0.2.0 was tagged but not published: its release failed in tests. This
+release has everything listed under 0.2.0.
+
+### Fixed
+
+- Times of hidden items are saved at microsecond precision, the precision
+  the database keeps.
+
 ## [0.2.0] - 2026-10-23
 
 ### Added
