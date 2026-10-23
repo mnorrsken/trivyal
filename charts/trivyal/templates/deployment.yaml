@@ -8,8 +8,11 @@ spec:
   replicas: {{ .Values.replicaCount }}
   {{- if .Values.persistence.enabled }}
   # The volume can be mounted by one pod at a time.
+  # rollingUpdate: null clears the defaults left over from an earlier
+  # RollingUpdate apply; server-side apply rejects Recreate otherwise.
   strategy:
     type: Recreate
+    rollingUpdate: null
   {{- end }}
   selector:
     matchLabels:
