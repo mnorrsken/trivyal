@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-23
+
 ### Added
 
 - Dashboard with vulnerability, misconfiguration, secret and RBAC totals,
@@ -18,3 +20,13 @@ All notable changes to this project are documented here. Headings use
 - Optional OpenID Connect login.
 - Helm chart with read-only RBAC, optional ingress, ServiceMonitor and OIDC
   settings.
+
+### Fixed
+
+- Pods reported on their own resolve to the custom resource that controls
+  them, and such owners appear as workloads.
+- When several reports cover one resource, only the newest report's checks
+  count.
+- Namespace totals count each image once, like the dashboard.
+- Exposed secrets are counted once per image in totals and once per
+  workload in lists.
