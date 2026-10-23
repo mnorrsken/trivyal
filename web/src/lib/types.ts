@@ -114,6 +114,7 @@ export interface CVEGroup {
 export interface Finding {
 	imageKey: string;
 	image: string;
+	imageName: string;
 	vuln: Vulnerability;
 	workloads: Workload[];
 }
@@ -167,6 +168,7 @@ export interface SecretFinding {
 	container?: string;
 	image: string;
 	imageKey: string;
+	imageName: string;
 	report: ReportRef;
 	secret: Secret;
 }
@@ -274,6 +276,7 @@ export interface Summary {
 	topImages: ImageGroup[];
 	namespaces: NamespaceSummary[] | null;
 	staleWorkloads: number;
+	hidden: number;
 }
 
 export interface SearchHit {
@@ -384,4 +387,28 @@ export interface WorkloadImage {
 	counts: Counts;
 	fixable: number;
 	hasSbom: boolean;
+}
+
+/** Something a user can hide; only the fields its kind needs are set. */
+export interface HideTarget {
+	kind: 'image' | 'image-cve' | 'cve' | 'secret' | 'check' | 'resource-check' | 'workload' | 'namespace';
+	image?: string;
+	id?: string;
+	type?: string;
+	rule?: string;
+	file?: string;
+	resource?: Resource;
+	namespace?: string;
+}
+
+/** A hidden target: findings were hidden, hiding of them are still there, new turned up since and show again. */
+export interface MarkInfo {
+	id: number;
+	target: HideTarget;
+	note: string;
+	created: string;
+	updated: string;
+	findings: number;
+	hiding: number;
+	new: number;
 }

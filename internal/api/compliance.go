@@ -58,8 +58,12 @@ type CheckInfo struct {
 }
 
 func (s *Server) complianceControl(w http.ResponseWriter, r *http.Request) {
-	snap, c := s.findCompliance(w, r)
+	_, c := s.findCompliance(w, r)
 	if c == nil {
+		return
+	}
+	snap, _, ok := s.visible(w, r)
+	if !ok {
 		return
 	}
 	id := r.PathValue("control")

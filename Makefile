@@ -34,9 +34,10 @@ run: build
 	./bin/trivyal
 
 # Backend against the current kubeconfig plus the Vite dev server with hot
-# reload on http://localhost:5173 (proxies /api to the backend).
+# reload on http://localhost:5173 (proxies /api to the backend). Hidden
+# items are kept in bin/trivyal.db.
 dev: build-go
-	@trap 'kill 0' EXIT; ./bin/trivyal -listen 127.0.0.1:8080 -metrics-listen 127.0.0.1:9090 & cd web && npm run dev
+	@trap 'kill 0' EXIT; ./bin/trivyal -listen 127.0.0.1:8080 -metrics-listen 127.0.0.1:9090 -database-url sqlite:bin/trivyal.db & cd web && npm run dev
 
 test: go-test web-test
 

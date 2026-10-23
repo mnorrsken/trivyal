@@ -7,6 +7,7 @@
 	import { date, imageHref, qs, shortDigest, total } from '#lib/format.ts';
 	import type { CVEGroup, Finding, ImageGroup, List, WorkloadGroup } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
@@ -32,7 +33,9 @@
 	const max = $derived(
 		Math.max(1, ...((d?.items ?? []) as (ImageGroup | WorkloadGroup)[]).map((i) => (i.counts ? total(i.counts) : 0)))
 	);
-	const csvHref = $derived('/api/v1/vulnerabilities.csv' + qs({ q: ls.q, stale: ls.stale ? '1' : undefined }));
+	const csvHref = $derived(
+		'/api/v1/vulnerabilities.csv' + qs({ q: ls.q, stale: ls.stale ? '1' : undefined, hidden: ls.hidden ? '1' : undefined })
+	);
 
 	const groups = [
 		{ value: 'image', label: 'Images' },
@@ -187,6 +190,7 @@
 					<th>Fixed in</th>
 					<SortTh key="image" current={sort} {onsort}>Image</SortTh>
 					<SortTh key="score" current={sort} {onsort} align="right">Score</SortTh>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -207,6 +211,9 @@
 							<div class="muted small">{x.workloads.length} workload{x.workloads.length === 1 ? '' : 's'}</div>
 						</td>
 						<td class="r num">{x.vuln.score?.toFixed(1) ?? '—'}</td>
+						<td class="r">
+							<HideButton target={{ kind: 'image-cve', image: x.imageName, id: x.vuln.vulnerabilityID }} small />
+						</td>
 					</tr>
 				{/each}
 			</tbody>

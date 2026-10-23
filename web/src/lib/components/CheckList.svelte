@@ -1,8 +1,10 @@
 <script lang="ts">
-	// Failed checks with expandable description and fix.
+	// Failed checks with expandable description and fix; an opened row can
+	// hide the check on its resource.
 	import { checkTypes } from '../checks';
 	import type { CheckFinding } from '../types';
 	import Empty from './Empty.svelte';
+	import HideButton from './HideButton.svelte';
 	import SevBadge from './SevBadge.svelte';
 	import WorkloadLink from './WorkloadLink.svelte';
 
@@ -48,6 +50,15 @@
 						<td colspan={showResource ? 4 : 3}>
 							{#if f.check.description}<p class="prose-sm">{f.check.description}</p>{/if}
 							{#if f.check.remediation}<p class="prose-sm fix"><strong>Fix:</strong> {f.check.remediation}</p>{/if}
+							{#if typeKnown}
+								<div class="hide">
+									<HideButton
+										target={{ kind: 'resource-check', type, id: f.check.checkID, resource: f.resource }}
+										label="Hide on this resource"
+										small
+									/>
+								</div>
+							{/if}
 						</td>
 					</tr>
 				{/if}
@@ -74,5 +85,8 @@
 	}
 	.fix {
 		margin-top: 6px;
+	}
+	.hide {
+		margin-top: 10px;
 	}
 </style>

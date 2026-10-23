@@ -17,6 +17,11 @@ class Live {
 		es.onerror = () => (this.connected = false);
 		es.onopen = () => (this.connected = true);
 	}
+
+	/** Refetch now, after a change made here (the server event comes later). */
+	bump() {
+		this.generation++;
+	}
 }
 
 export const live = new Live();

@@ -26,6 +26,8 @@ podLabels: {}
 
 podSecurityContext:
   runAsNonRoot: true
+  # Makes the data volume writable for the container user.
+  fsGroup: 65532
   seccompProfile:
     type: RuntimeDefault
 
@@ -71,6 +73,18 @@ affinity: {}
 config:
   # debug, info, warn or error
   logLevel: info
+
+# What users hide in the UI is kept in a SQLite database on this volume.
+# With persistence off it is an emptyDir and is lost when the pod goes. One
+# writer only: keep replicaCount at 1.
+persistence:
+  enabled: true
+  # Use an existing PersistentVolumeClaim instead of creating one.
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
 
 # Optional login with OpenID Connect. Without it, trivyal has no login of its
 # own: keep it off the internet or put an authenticating proxy in front.

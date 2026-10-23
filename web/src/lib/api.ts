@@ -19,7 +19,20 @@ export async function api<T>(path: string, params?: Record<string, string | numb
 		const s = sp.toString();
 		if (s) url += (url.includes('?') ? '&' : '?') + s;
 	}
-	const res = await fetch(url, { headers: { Accept: 'application/json' } });
+	return handle<T>(await fetch(url, { headers: { Accept: 'application/json' } }));
+}
+
+/** Sends a change (POST with a JSON body, DELETE). */
+export async function apiSend<T>(method: 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+	const res = await fetch('/api/v1/' + path, {
+		method,
+		headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	return handle<T>(res);
+}
+
+async function handle<T>(res: Response): Promise<T> {
 	if (res.status === 401) {
 		// OIDC session expired: start a new login and come back here.
 		location.href = '/auth/login?rd=' + encodeURIComponent(location.pathname + location.search);
@@ -34,5 +47,5 @@ export async function api<T>(path: string, params?: Record<string, string | numb
 		}
 		throw new APIError(msg, res.status);
 	}
-	return res.json();
+	return res.status === 204 ? (undefined as T) : res.json();
 }

@@ -14,6 +14,7 @@ type SecretScan struct {
 	Container string                  `json:"container,omitempty"`
 	Image     string                  `json:"image"`
 	ImageKey  string                  `json:"imageKey"`
+	ImageName string                  `json:"imageName"`
 	Report    ReportRef               `json:"report"`
 	Summary   reports.SeveritySummary `json:"summary"`
 	Updated   time.Time               `json:"updated"`
@@ -89,6 +90,7 @@ func (s *Snapshot) addSecrets(kind string, r *reports.ExposedSecretReport, w Wor
 	scan := &SecretScan{
 		Workload: w, Container: r.Container,
 		Image: ImageRef(r.Registry, r.Artifact), ImageKey: imageKey(r.Registry, r.Artifact),
+		ImageName: ImageRef(r.Registry, reports.Artifact{Repository: r.Artifact.Repository}),
 		Report: ReportRef{kind, r.Namespace, r.Name}, Summary: r.Summary, Updated: r.Updated,
 	}
 	s.SecretScans = append(s.SecretScans, scan)
@@ -124,6 +126,7 @@ type SecretFinding struct {
 	Container string          `json:"container,omitempty"`
 	Image     string          `json:"image"`
 	ImageKey  string          `json:"imageKey"`
+	ImageName string          `json:"imageName"`
 	Report    ReportRef       `json:"report"`
 	Secret    *reports.Secret `json:"secret"`
 }
@@ -134,7 +137,7 @@ func SecretFindings(rows []*SecretRow) []*SecretFinding {
 	for i, r := range rows {
 		out[i] = &SecretFinding{
 			Workload: r.Scan.Workload, Container: r.Scan.Container, Image: r.Scan.Image,
-			ImageKey: r.Scan.ImageKey, Report: r.Scan.Report, Secret: r.S,
+			ImageKey: r.Scan.ImageKey, ImageName: r.Scan.ImageName, Report: r.Scan.Report, Secret: r.S,
 		}
 	}
 	return out

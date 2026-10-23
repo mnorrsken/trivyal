@@ -5,23 +5,28 @@
 	import { live } from '#lib/live.svelte.ts';
 	import { checkTypes } from '#lib/checks.ts';
 	import { reportHref } from '#lib/format.ts';
-	import type { Check, CheckFinding } from '#lib/types.ts';
+	import type { Check, CheckFinding, MarkInfo } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
+	import HideControls from '#lib/components/HideControls.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import WorkloadLink from '#lib/components/WorkloadLink.svelte';
 
 	interface CheckDetail {
 		check: Check;
 		resources: CheckFinding[];
+		hidden?: MarkInfo;
 	}
 
 	const type = $derived(page.params.type ?? 'config');
 	const id = $derived(page.params.id ?? '');
+	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<CheckDetail>();
 	$effect(() => {
 		const path = `checks/${type}/${encodeURIComponent(id)}`;
+		const p = { hidden };
 		live.generation;
-		f.run(() => api<CheckDetail>(path));
+		f.run(() => api<CheckDetail>(path, p));
 	});
 	const d = $derived(f.data);
 	let text = $state('');
@@ -45,6 +50,9 @@
 		</p>
 		<h1><span class="mono">{d.check.checkID}</span> <SevBadge severity={d.check.severity} /></h1>
 		<p class="title">{d.check.title}</p>
+		<div class="ctl">
+			<HideControls target={{ kind: 'check', type, id: d.check.checkID }} mark={d.hidden} noun="check" />
+		</div>
 	</header>
 
 	<section class="card pad info">
@@ -62,7 +70,7 @@
 			<input placeholder="Filter resources" bind:value={text} />
 		</div>
 		<table class="table">
-			<thead><tr><th>Resource</th><th>Status</th><th>Message</th><th></th></tr></thead>
+			<thead><tr><th>Resource</th><th>Status</th><th>Message</th><th></th><th></th></tr></thead>
 			<tbody>
 				{#each rows as r, i (r.report.name + i)}
 					<tr>
@@ -72,6 +80,11 @@
 						</td>
 						<td class="small ink2">{r.check.messages?.join(' ') ?? ''}</td>
 						<td class="small"><a class="link" href={reportHref(r.report)}>report</a></td>
+						<td class="r">
+							{#if !r.check.success}
+								<HideButton target={{ kind: 'resource-check', type, id: r.check.checkID, resource: r.resource }} small />
+							{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>
@@ -94,6 +107,9 @@
 	.title {
 		margin-top: 4px;
 		color: var(--ink-2);
+	}
+	.ctl {
+		margin-top: 12px;
 	}
 	.pad {
 		padding: 16px;

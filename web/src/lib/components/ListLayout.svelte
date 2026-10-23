@@ -26,6 +26,7 @@
 		noun,
 		placeholder,
 		showStale = true,
+		showHidden = true,
 		actions,
 		children
 	}: {
@@ -44,6 +45,7 @@
 		noun: string;
 		placeholder?: string;
 		showStale?: boolean;
+		showHidden?: boolean;
 		actions?: Snippet;
 		children: Snippet;
 	} = $props();
@@ -82,6 +84,12 @@
 			<label class="stale">
 				<input type="checkbox" checked={ls.stale} onchange={(e) => ls.update({ stale: e.currentTarget.checked ? '1' : '' })} />
 				Include old ReplicaSets
+			</label>
+		{/if}
+		{#if showHidden}
+			<label class="stale">
+				<input type="checkbox" checked={ls.hidden} onchange={(e) => ls.update({ hidden: e.currentTarget.checked ? '1' : '' })} />
+				Show hidden
 			</label>
 		{/if}
 	</aside>

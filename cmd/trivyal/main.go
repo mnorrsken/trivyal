@@ -19,6 +19,7 @@ import (
 	"github.com/mnorrsken/trivyal/internal/auth"
 	"github.com/mnorrsken/trivyal/internal/index"
 	"github.com/mnorrsken/trivyal/internal/kube"
+	"github.com/mnorrsken/trivyal/internal/store"
 	"github.com/mnorrsken/trivyal/internal/version"
 	"github.com/mnorrsken/trivyal/internal/web"
 )
@@ -41,6 +42,7 @@ func run() error {
 	listen := flag.String("listen", env("LISTEN_ADDR", ":8080"), "HTTP listen address (env LISTEN_ADDR)")
 	metricsListen := flag.String("metrics-listen", env("METRICS_ADDR", ":9090"), "metrics listen address, empty disables (env METRICS_ADDR)")
 	kubeconfig := flag.String("kubeconfig", env("KUBECONFIG", ""), "kubeconfig path; in-cluster config when empty and available (env KUBECONFIG)")
+	databaseURL := flag.String("database-url", env("DATABASE_URL", ""), "where hidden items are kept, sqlite:<path>; empty keeps them in memory (env DATABASE_URL)")
 	logLevel := flag.String("log-level", env("LOG_LEVEL", "info"), "debug, info, warn or error (env LOG_LEVEL)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	oidcIssuer := flag.String("oidc-issuer-url", env("OIDC_ISSUER_URL", ""), "OIDC issuer; enables login when set (env OIDC_ISSUER_URL)")
@@ -69,6 +71,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	st, err := store.Open(ctx, *databaseURL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+	if *databaseURL == "" {
+		slog.Warn("no database configured: hidden items are lost on restart")
+	}
 	var idx *index.Index
 	var hub *api.Hub
 	cache, err := kube.New(cfg, func() {
@@ -79,11 +89,12 @@ func run() error {
 		return err
 	}
 	idx = index.New(cache)
-	hub = api.NewHub(idx.Generation, 2*time.Second)
+	// Both counters only grow, so the sum changes when either does.
+	hub = api.NewHub(func() uint64 { return idx.Generation() + st.Version() }, 2*time.Second)
 	metrics := api.NewMetrics(hub)
 
 	mux := http.NewServeMux()
-	api.New(idx, cache, hub, metrics).Register(mux)
+	api.New(idx, cache, hub, metrics, st).Register(mux)
 	mux.Handle("/", web.Handler())
 	var handler http.Handler = mux
 	if *oidcIssuer != "" {

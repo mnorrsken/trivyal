@@ -2,8 +2,8 @@
 
 A web UI for [trivy-operator](https://github.com/aquasecurity/trivy-operator)
 reports, made for small clusters such as a homelab. It runs inside the
-cluster, reads the report CRDs through the Kubernetes API and needs no
-database.
+cluster and reads the report CRDs through the Kubernetes API. Only the list
+of hidden findings is stored, in a small SQLite file.
 
 - **Dashboard**: vulnerability, misconfiguration, secret and RBAC totals,
   compliance scores, the most vulnerable images and a per-namespace overview.
@@ -20,6 +20,11 @@ database.
 - **Live**: pages update when trivy-operator writes new reports.
 - Findings are counted once per image, even when several workloads run it.
   Old ReplicaSet revisions (scaled to zero) are hidden unless you ask for them.
+- **Hide what you have handled**: images, CVEs, secrets, checks, workloads or
+  namespaces. Hidden findings drop out of counts, lists, facets, CSV exports
+  and the dashboard; findings that appear later show again. Review them on
+  the Hidden page or with "Show hidden". Search, SBOM and raw reports are
+  not filtered.
 - Optional OpenID Connect login.
 
 ## Filter language
@@ -71,7 +76,16 @@ namespaces. Set `rbac.create=false` to manage it yourself.
 | `auth.oidc.groupsClaim` | `groups` | ID token claim with the user's groups |
 | `metrics.enabled` | `false` | Prometheus metrics on port 9090 |
 | `metrics.serviceMonitor.enabled` | `false` | ServiceMonitor for the Prometheus Operator |
+| `persistence.enabled` | `true` | Keep hidden items in a PVC (SQLite at `/data/trivyal.db`); off uses an emptyDir |
+| `persistence.existingClaim` | | Use this PVC instead of creating one |
+| `persistence.storageClass` | | Storage class of the new PVC |
+| `persistence.accessModes` | `[ReadWriteOnce]` | Access modes of the new PVC |
+| `persistence.size` | `1Gi` | Size of the new PVC |
 | `config.logLevel` | `info` | `debug`, `info`, `warn` or `error` |
+
+With persistence on, the Deployment uses the `Recreate` strategy. The pod
+runs with `fsGroup: 65532` so the volume is writable. SQLite has one writer:
+keep `replicaCount` at 1.
 
 ### Access control
 
@@ -109,7 +123,9 @@ trivyal -listen 127.0.0.1:8080
 
 Flags (and environment variables): `-listen` (`LISTEN_ADDR`, `:8080`),
 `-metrics-listen` (`METRICS_ADDR`, `:9090`, empty disables), `-kubeconfig`
-(`KUBECONFIG`), `-log-level` (`LOG_LEVEL`) and the `-oidc-*` flags
+(`KUBECONFIG`), `-database-url` (`DATABASE_URL`, `sqlite:<path>`; empty
+keeps hidden items in memory and loses them on restart), `-log-level`
+(`LOG_LEVEL`) and the `-oidc-*` flags
 (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_REDIRECT_URL`, `OIDC_SCOPES`,
 `OIDC_GROUPS_CLAIM`, `OIDC_ALLOWED_GROUPS`, `OIDC_ALLOWED_EMAILS`). Secrets
 are read only from the environment: `OIDC_CLIENT_SECRET`, `SESSION_KEY`.
@@ -121,7 +137,7 @@ Go backend (`cmd/`, `internal/`) and a Svelte 5 / SvelteKit static app in
 
 ```sh
 make build     # web + Go into bin/trivyal
-make dev       # backend on :8080 with your kubeconfig + Vite on :5173
+make dev       # backend on :8080 (db in bin/trivyal.db) + Vite on :5173
 make test      # Go tests, svelte-check and vitest
 make lint      # golangci-lint
 make lab       # kind cluster with trivy-operator and this build

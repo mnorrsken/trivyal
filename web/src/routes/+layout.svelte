@@ -22,7 +22,8 @@
 		{ href: '/checks/rbac', label: 'RBAC' },
 		{ href: '/checks/infra', label: 'Infrastructure' },
 		{ href: '/compliance', label: 'Compliance' },
-		{ href: '/sbom', label: 'SBOM' }
+		{ href: '/sbom', label: 'SBOM' },
+		{ href: '/hidden', label: 'Hidden' }
 	];
 	const clusterNav = [
 		{ href: '/workloads', label: 'Workloads', also: ['/workload', '/pod'] },

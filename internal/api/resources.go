@@ -113,8 +113,8 @@ var workloadSorts = map[string]func(a, b *WorkloadRow) int{
 	"fixable": func(a, b *WorkloadRow) int { return cmp.Compare(b.Stats.Fixable, a.Stats.Fixable) },
 }
 
-func (s *Server) workloadRows() []*WorkloadRow {
-	stats := s.snapshot().WorkloadStats()
+func (s *Server) workloadRows(snap *index.Snapshot) []*WorkloadRow {
+	stats := snap.WorkloadStats()
 	var rows []*WorkloadRow
 	for _, w := range s.cluster.Workloads() {
 		st := stats[w.String()]
@@ -137,7 +137,11 @@ func (s *Server) workloads(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	rows := s.workloadRows()
+	snap, _, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
+	rows := s.workloadRows(snap)
 	m := query.NewMatcher(p.q, WorkloadSchema)
 	all := make([]query.Row, len(rows))
 	var matched []*WorkloadRow
@@ -158,6 +162,7 @@ type WorkloadDetail struct {
 	Resource reports.Resource       `json:"resource"`
 	Pods     []kube.PodInfo         `json:"pods"`
 	Reports  *index.WorkloadReports `json:"reports"`
+	Hidden   *MarkInfo              `json:"hidden,omitempty"`
 }
 
 func (s *Server) workload(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +175,16 @@ func (s *Server) workload(w http.ResponseWriter, r *http.Request) {
 	if info, ok := s.cluster.Workload(res.Kind, res.Namespace, res.Name); ok {
 		d.Workload = &info
 	}
-	d.Reports = s.snapshot().ForWorkload(res)
+	snap, uv, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
+	d.Reports = snap.ForWorkload(res)
 	if d.Workload == nil && len(d.Reports.Reports) == 0 {
 		writeError(w, http.StatusNotFound, "workload not found")
 		return
 	}
+	d.Hidden = uv.mark(index.Target{Kind: index.HideWorkload, Resource: &res})
 	d.Pods = s.cluster.Pods(func(p kube.PodInfo) bool { return p.Workload == res })
 	if d.Pods == nil {
 		d.Pods = []kube.PodInfo{}
@@ -224,7 +234,7 @@ type NamespaceRow struct {
 	Secrets   int                     `json:"secrets"`
 }
 
-func (s *Server) namespaceRows() []*NamespaceRow {
+func (s *Server) namespaceRows(snap *index.Snapshot) []*NamespaceRow {
 	byName := map[string]*NamespaceRow{}
 	var out []*NamespaceRow
 	for _, ns := range s.cluster.Namespaces() {
@@ -239,7 +249,7 @@ func (s *Server) namespaceRows() []*NamespaceRow {
 	}
 	// Totals count each image's finding once per namespace, the same way
 	// the dashboard does.
-	for _, n := range s.snapshot().Summary().Namespaces {
+	for _, n := range snap.Summary().Namespaces {
 		if row := byName[n.Namespace]; row != nil {
 			row.Vulns, row.Config, row.Secrets = n.Vulns, n.Config, n.Secrets
 		}
@@ -247,8 +257,12 @@ func (s *Server) namespaceRows() []*NamespaceRow {
 	return out
 }
 
-func (s *Server) namespaces(w http.ResponseWriter, _ *http.Request) {
-	rows := s.namespaceRows()
+func (s *Server) namespaces(w http.ResponseWriter, r *http.Request) {
+	snap, _, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
+	rows := s.namespaceRows(snap)
 	slices.SortFunc(rows, func(a, b *NamespaceRow) int {
 		return cmp.Or(sevCmp(a.Vulns, b.Vulns), cmp.Compare(a.Name, b.Name))
 	})
@@ -261,12 +275,17 @@ type NamespaceDetail struct {
 	WorkloadList []*WorkloadRow        `json:"workloadList"`
 	Config       []*index.CheckFinding `json:"configFindings"`
 	RBAC         []*index.CheckFinding `json:"rbacFindings"`
+	Hidden       *MarkInfo             `json:"hidden,omitempty"`
 }
 
 func (s *Server) namespace(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	snap, uv, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
 	var row *NamespaceRow
-	for _, n := range s.namespaceRows() {
+	for _, n := range s.namespaceRows(snap) {
 		if n.Name == name {
 			row = n
 		}
@@ -275,18 +294,17 @@ func (s *Server) namespace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "namespace not found")
 		return
 	}
-	d := NamespaceDetail{NamespaceRow: row, WorkloadList: []*WorkloadRow{}}
+	d := NamespaceDetail{NamespaceRow: row, WorkloadList: []*WorkloadRow{}, Hidden: uv.mark(index.Target{Kind: index.HideNamespace, Namespace: name})}
 	// Workload misconfigurations are on the workload rows; list the other
 	// resources (services, ingresses, PVCs...) here.
 	isWorkload := map[string]bool{}
-	for _, wr := range s.workloadRows() {
+	for _, wr := range s.workloadRows(snap) {
 		if wr.Namespace == name {
 			d.WorkloadList = append(d.WorkloadList, wr)
 			isWorkload[wr.String()] = true
 		}
 	}
 	slices.SortStableFunc(d.WorkloadList, workloadSorts["severity"])
-	snap := s.snapshot()
 	inNS := func(w index.Workload) bool { return w.Namespace == name }
 	podLike := map[string]bool{"Pod": true, "ReplicaSet": true, "Job": true}
 	d.Config = snap.ChecksFor(index.CheckConfig, func(w index.Workload) bool {
@@ -317,8 +335,12 @@ func (s *Server) node(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "node not found")
 		return
 	}
+	snap, _, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
 	d := NodeDetail{NodeInfo: n}
-	d.Infra = s.snapshot().ChecksFor(index.CheckInfra, func(w index.Workload) bool { return w.Kind == "Node" && w.Name == n.Name })
+	d.Infra = snap.ChecksFor(index.CheckInfra, func(w index.Workload) bool { return w.Kind == "Node" && w.Name == n.Name })
 	d.Pods = s.cluster.Pods(func(p kube.PodInfo) bool { return p.Node == n.Name })
 	if d.Pods == nil {
 		d.Pods = []kube.PodInfo{}

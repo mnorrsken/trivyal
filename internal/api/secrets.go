@@ -20,7 +20,10 @@ func (s *Server) secrets(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	snap := s.snapshot()
+	snap, _, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
 	rows, all, m := snap.MatchSecrets(p.q, p.stale)
 	f := index.SecretFindings(index.UniqueSecrets(rows))
 	res := SecretList{List: List{Page: p.page, Size: p.size, Group: "finding", Rows: len(rows), Total: len(f), Facets: m.Facets(all, index.SecretFacets, 50)}}

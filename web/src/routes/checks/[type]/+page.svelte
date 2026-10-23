@@ -9,6 +9,7 @@
 	import { checkTypes } from '#lib/checks.ts';
 	import type { CheckFinding, CheckGroup, List, ResourceGroup } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
@@ -131,6 +132,7 @@
 					<SortTh key="id" current={sort} {onsort}>Check</SortTh>
 					<SortTh key="resource" current={sort} {onsort}>Resource</SortTh>
 					<th>Message</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -143,6 +145,11 @@
 						</td>
 						<td class="main"><WorkloadLink w={x.resource} /></td>
 						<td class="small ink2 msg">{x.check.messages?.join(' ') ?? ''}</td>
+						<td class="r">
+							{#if !x.check.success}
+								<HideButton target={{ kind: 'resource-check', type, id: x.check.checkID, resource: x.resource }} small />
+							{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>

@@ -4,9 +4,21 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { ago, imageHref, reportHref } from '#lib/format.ts';
-	import type { CheckFinding, Container, PodInfo, Resource, SecretFinding, WorkloadImage, WorkloadInfo, Counts } from '#lib/types.ts';
+	import type {
+		CheckFinding,
+		Container,
+		MarkInfo,
+		PodInfo,
+		Resource,
+		SecretFinding,
+		WorkloadImage,
+		WorkloadInfo,
+		Counts
+	} from '#lib/types.ts';
 	import CheckList from '#lib/components/CheckList.svelte';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
+	import HideControls from '#lib/components/HideControls.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import PodTable from '#lib/components/PodTable.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
@@ -22,16 +34,19 @@
 			secrets: SecretFinding[];
 			reports: { type: string; namespace?: string; name: string }[];
 		};
+		hidden?: MarkInfo;
 	}
 
 	const ns = $derived(page.params.ns ?? '_');
 	const kind = $derived(page.params.kind ?? '');
 	const name = $derived(page.params.name ?? '');
+	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<Detail>();
 	$effect(() => {
 		const p = `workload/${encodeURIComponent(ns)}/${encodeURIComponent(kind)}/${encodeURIComponent(name)}`;
+		const params = { hidden };
 		live.generation;
-		f.run(() => api<Detail>(p));
+		f.run(() => api<Detail>(p, params));
 	});
 	const d = $derived(f.data);
 	const w = $derived(d?.workload);
@@ -98,6 +113,9 @@
 			{:else}
 				<span class="pill">not found in the cluster; showing reports only</span>
 			{/if}
+		</div>
+		<div class="ctl">
+			<HideControls target={{ kind: 'workload', resource: d.resource }} mark={d.hidden} noun="workload" />
 		</div>
 	</header>
 
@@ -171,7 +189,7 @@
 		<section class="card sec">
 			<h2 class="section-title pad">Exposed secrets</h2>
 			<table class="table">
-				<thead><tr><th>Severity</th><th>Secret</th><th>File</th><th>Container</th></tr></thead>
+				<thead><tr><th>Severity</th><th>Secret</th><th>File</th><th>Container</th><th></th></tr></thead>
 				<tbody>
 					{#each d.reports.secrets as s, i (s.secret.ruleID + s.secret.target + i)}
 						<tr>
@@ -179,6 +197,9 @@
 							<td>{s.secret.title}<div class="muted small mono">{s.secret.ruleID}</div></td>
 							<td class="mono small">{s.secret.target}</td>
 							<td class="mono small">{s.container}</td>
+							<td class="r">
+								<HideButton target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} small />
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -230,7 +251,10 @@
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;
-		margin: 10px 0 16px;
+		margin: 10px 0 12px;
+	}
+	.ctl {
+		margin-bottom: 16px;
 	}
 	.pill.bad {
 		color: var(--sev-critical);

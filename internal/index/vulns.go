@@ -12,8 +12,10 @@ import (
 
 // Image is one container image, deduplicated by digest across workloads.
 type Image struct {
-	Key        string                  `json:"key"`
-	Ref        string                  `json:"ref"`
+	Key string `json:"key"`
+	Ref string `json:"ref"`
+	// Name is the reference without tag, the same for every build.
+	Name       string                  `json:"name"`
 	Registry   string                  `json:"registry"`
 	Repository string                  `json:"repository"`
 	Tag        string                  `json:"tag,omitempty"`
@@ -119,6 +121,7 @@ func (s *Snapshot) addVulns(kind string, r *reports.VulnerabilityReport, w Workl
 		img = &Image{
 			Key:        key,
 			Ref:        ImageRef(r.Registry, r.Artifact),
+			Name:       ImageRef(r.Registry, reports.Artifact{Repository: r.Artifact.Repository}),
 			Registry:   ImageRef(r.Registry, reports.Artifact{}),
 			Repository: r.Artifact.Repository,
 			Tag:        cleanTag(r.Artifact.Tag),
@@ -312,6 +315,7 @@ func GroupByCVE(rows []*VulnRow) []*CVEGroup {
 type Finding struct {
 	ImageKey  string                 `json:"imageKey"`
 	Image     string                 `json:"image"`
+	ImageName string                 `json:"imageName"`
 	Vuln      *reports.Vulnerability `json:"vuln"`
 	Workloads []Workload             `json:"workloads"`
 }
@@ -325,7 +329,7 @@ func GroupByFinding(rows []*VulnRow) []*Finding {
 		k := findingKey(r.Image, r.V)
 		f := groups[k]
 		if f == nil {
-			f = &Finding{ImageKey: r.Image.Key, Image: r.Image.Ref, Vuln: r.V}
+			f = &Finding{ImageKey: r.Image.Key, Image: r.Image.Ref, ImageName: r.Image.Name, Vuln: r.V}
 			groups[k] = f
 			order = append(order, f)
 		}

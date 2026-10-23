@@ -1,11 +1,13 @@
 <script lang="ts">
 	// Vulnerabilities of one image, filtered in the browser (lists are small).
+	// With imageName, an opened row can hide its CVE in this image.
 	import { date, sevLabel, severities } from '../format';
 	import type { Vulnerability } from '../types';
 	import Empty from './Empty.svelte';
+	import HideButton from './HideButton.svelte';
 	import SevBadge from './SevBadge.svelte';
 
-	let { vulns }: { vulns: Vulnerability[] } = $props();
+	let { vulns, imageName }: { vulns: Vulnerability[]; imageName?: string } = $props();
 
 	let text = $state('');
 	let sev = $state<string[]>([]);
@@ -97,6 +99,11 @@
 											<a class="link" href={v.primaryLink} target="_blank" rel="noreferrer">{v.primaryLink}</a>
 										</dd>{/if}
 								</dl>
+								{#if imageName}
+									<div class="hide">
+										<HideButton target={{ kind: 'image-cve', image: imageName, id: v.vulnerabilityID }} label="Hide in this image" small />
+									</div>
+								{/if}
 							</td>
 						</tr>
 					{/if}
@@ -210,5 +217,8 @@
 	}
 	.more {
 		margin: 12px;
+	}
+	.hide {
+		margin-top: 10px;
 	}
 </style>

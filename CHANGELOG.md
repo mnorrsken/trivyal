@@ -5,6 +5,37 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Added
+
+- Hide what you have handled: an image (all tags), a CVE in one image or
+  everywhere, an exposed secret, a check everywhere or on one resource, a
+  workload or a namespace. Hidden findings leave all counts, lists, facets,
+  CSV exports and the dashboard. Search, SBOM and raw reports are not
+  filtered.
+- Hiding covers the findings the target has now. New findings (a new CVE, a
+  new package version) show again; a rebuild with the same packages stays
+  hidden.
+- "Show hidden" toggle (`?hidden=1`), Unhide and "Hide new findings too" on
+  hidden detail pages, a Hidden page (`/hidden`) and a hidden count on the
+  dashboard.
+- `GET/POST /api/v1/hidden` and `DELETE /api/v1/hidden/{id}`; list and detail
+  endpoints accept `hidden=1`.
+- `-database-url` / `DATABASE_URL` (`sqlite:<path>`) stores hidden items in
+  SQLite (bun ORM, pure Go, no CGO). Empty keeps them in memory.
+- Helm `persistence` values with a PVC for the database at `/data`, and
+  `podSecurityContext.fsGroup: 65532`.
+
+### Changed
+
+- Hidden items are stored per user; for now there is one anonymous user, also
+  with OIDC on.
+- With persistence on, the Deployment uses the `Recreate` strategy. Keep
+  `replicaCount` at 1 (SQLite has one writer).
+
+### Fixed
+
+- "Fixed in" versions stayed in place instead of scrolling with their table.
+
 ## [0.1.0] - 2026-10-23
 
 ### Added

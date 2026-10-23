@@ -4,21 +4,29 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { ago, qs, total } from '#lib/format.ts';
-	import type { CheckFinding, NamespaceRow, WorkloadRow } from '#lib/types.ts';
+	import type { CheckFinding, MarkInfo, NamespaceRow, WorkloadRow } from '#lib/types.ts';
 	import CheckList from '#lib/components/CheckList.svelte';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideControls from '#lib/components/HideControls.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
 	import WorkloadLink from '#lib/components/WorkloadLink.svelte';
 
-	type Detail = NamespaceRow & { workloadList: WorkloadRow[]; configFindings: CheckFinding[]; rbacFindings: CheckFinding[] };
+	type Detail = NamespaceRow & {
+		workloadList: WorkloadRow[];
+		configFindings: CheckFinding[];
+		rbacFindings: CheckFinding[];
+		hidden?: MarkInfo;
+	};
 
 	const name = $derived(page.params.name ?? '');
+	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<Detail>();
 	$effect(() => {
 		const n = name;
+		const p = { hidden };
 		live.generation;
-		f.run(() => api<Detail>('namespace/' + encodeURIComponent(n)));
+		f.run(() => api<Detail>('namespace/' + encodeURIComponent(n), p));
 	});
 	const d = $derived(f.data);
 	const max = $derived(Math.max(1, ...(d?.workloadList ?? []).map((w) => total(w.stats.vulns))));
@@ -46,6 +54,9 @@
 			<a class="btn" href="/secrets{nsq}">Secrets</a>
 			<a class="btn" href="/checks/rbac{nsq}">RBAC</a>
 		</nav>
+		<div class="ctl">
+			<HideControls target={{ kind: 'namespace', namespace: d.name }} mark={d.hidden} noun="namespace" />
+		</div>
 	</header>
 
 	<div class="tiles">
@@ -109,6 +120,9 @@
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;
+		margin-bottom: 16px;
+	}
+	.ctl {
 		margin-bottom: 16px;
 	}
 	.tiles {

@@ -6,6 +6,11 @@ metadata:
     {{- include "trivyal.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if .Values.persistence.enabled }}
+  # The volume can be mounted by one pod at a time.
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "trivyal.selectorLabels" . | nindent 6 }}
@@ -44,6 +49,8 @@ spec:
               value: {{ if .Values.metrics.enabled }}{{ printf ":%v" .Values.metrics.port | quote }}{{ else }}""{{ end }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
+            - name: DATABASE_URL
+              value: sqlite:/data/trivyal.db
             {{- with .Values.auth.oidc }}
             {{- if .enabled }}
             - name: OIDC_ISSUER_URL
@@ -91,8 +98,19 @@ spec:
               path: /readyz
               port: http
             periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "trivyal.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

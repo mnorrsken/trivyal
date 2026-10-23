@@ -25,6 +25,9 @@ export class ListState {
 	get stale() {
 		return page.url.searchParams.get('stale') === '1';
 	}
+	get hidden() {
+		return page.url.searchParams.get('hidden') === '1';
+	}
 
 	/** Parameters for the API call. */
 	get params(): Record<string, string | number | undefined> {
@@ -34,7 +37,8 @@ export class ListState {
 			sort: this.sort,
 			page: this.page,
 			size: this.size,
-			stale: this.stale ? '1' : undefined
+			stale: this.stale ? '1' : undefined,
+			hidden: this.hidden ? '1' : undefined
 		};
 	}
 

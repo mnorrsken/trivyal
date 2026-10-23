@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/mnorrsken/trivyal/internal/index"
 	"github.com/mnorrsken/trivyal/internal/kube"
 	"github.com/mnorrsken/trivyal/internal/reports"
+	"github.com/mnorrsken/trivyal/internal/store"
 )
 
 // fakeBackend serves the fixture reports plus a few cluster objects.
@@ -71,8 +73,13 @@ func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	idx := index.New(fixture.New(t))
 	hub := NewHub(idx.Generation, 10*time.Millisecond)
+	st, err := store.Open(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
 	mux := http.NewServeMux()
-	New(idx, fakeBackend{synced: true}, hub, NewMetrics(hub)).Register(mux)
+	New(idx, fakeBackend{synced: true}, hub, NewMetrics(hub), st).Register(mux)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -282,5 +289,108 @@ func TestEvents(t *testing.T) {
 	n, _ = res.Body.Read(buf)
 	if !strings.Contains(string(buf[:n]), "event: changed") {
 		t.Errorf("second event = %q", buf[:n])
+	}
+}
+
+func send(t *testing.T, srv *httptest.Server, method, path, body string, want int, v any) {
+	t.Helper()
+	req, err := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != want {
+		t.Fatalf("%s %s: status %d, want %d", method, path, res.StatusCode, want)
+	}
+	if v != nil {
+		if err := json.NewDecoder(res.Body).Decode(v); err != nil {
+			t.Fatalf("%s %s: decoding: %v", method, path, err)
+		}
+	}
+}
+
+func TestHidden(t *testing.T) {
+	srv := newTestServer(t)
+	var m MarkInfo
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"image","image":"registry.example.com/shop/web"},"note":"checked"}`, http.StatusOK, &m)
+	if m.ID == 0 || m.Note != "checked" || m.Findings != 5 || m.Hiding != 5 || m.New != 0 {
+		t.Errorf("hide = %+v", m)
+	}
+
+	var l list
+	get(t, srv, "/api/v1/vulnerabilities", http.StatusOK, &l)
+	if l.Total != 3 {
+		t.Errorf("images after hiding one: %d, want 3", l.Total)
+	}
+	get(t, srv, "/api/v1/vulnerabilities?hidden=1", http.StatusOK, &l)
+	if l.Total != 4 {
+		t.Errorf("images with hidden=1: %d, want 4", l.Total)
+	}
+	get(t, srv, "/api/v1/secrets", http.StatusOK, &l)
+	if l.Total != 1 {
+		t.Errorf("secrets after hiding the image: %d, want 1", l.Total)
+	}
+	var img ImageDetail
+	get(t, srv, "/api/v1/image?key=sha256:aaa", http.StatusOK, &img)
+	if img.Hidden == nil || img.Hidden.ID != m.ID || img.Vulnerabilities == nil || len(img.Vulnerabilities) != 0 || img.Summary.Total() != 0 {
+		t.Errorf("hidden image detail: mark %+v, %d vulns", img.Hidden, len(img.Vulnerabilities))
+	}
+	var s struct {
+		index.Summary
+		Hidden int `json:"hidden"`
+	}
+	get(t, srv, "/api/v1/summary", http.StatusOK, &s)
+	if s.Hidden != 1 || s.Vulns.Images != 3 {
+		t.Errorf("summary: hidden %d, images %d", s.Hidden, s.Vulns.Images)
+	}
+
+	// A hidden CVE still has a page, with nothing affected.
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"cve","id":"CVE-2024-0001"}}`, http.StatusOK, nil)
+	var cve CVEDetail
+	get(t, srv, "/api/v1/cve/CVE-2024-0001", http.StatusOK, &cve)
+	if cve.Hidden == nil || len(cve.Affected) != 0 {
+		t.Errorf("hidden cve: mark %+v, %d affected", cve.Hidden, len(cve.Affected))
+	}
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"check","type":"config","id":"avd-ksv-0014"}}`, http.StatusOK, nil)
+	var chk CheckDetail
+	get(t, srv, "/api/v1/checks/config/AVD-KSV-0014", http.StatusOK, &chk)
+	if chk.Hidden == nil || len(chk.Resources) != 0 {
+		t.Errorf("hidden check: mark %+v, %d resources", chk.Hidden, len(chk.Resources))
+	}
+
+	// Hiding again without a note keeps the note.
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"image","image":"registry.example.com/shop/web"}}`, http.StatusOK, &m)
+	if m.Note != "checked" {
+		t.Errorf("note after hiding again = %q", m.Note)
+	}
+	var all []MarkInfo
+	get(t, srv, "/api/v1/hidden", http.StatusOK, &all)
+	if len(all) != 3 || all[0].ID != m.ID {
+		t.Errorf("hidden list = %+v", all)
+	}
+
+	send(t, srv, "DELETE", "/api/v1/hidden/"+strconv.FormatInt(m.ID, 10), "", http.StatusNoContent, nil)
+	send(t, srv, "DELETE", "/api/v1/hidden/"+strconv.FormatInt(m.ID, 10), "", http.StatusNotFound, nil)
+	get(t, srv, "/api/v1/vulnerabilities?q=-cve:CVE-2024-0001", http.StatusOK, &l)
+	if l.Total != 4 {
+		t.Errorf("images after unhiding: %d, want 4", l.Total)
+	}
+
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"namespace","namespace":"nowhere"}}`, http.StatusNotFound, nil)
+	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"bogus"}}`, http.StatusBadRequest, nil)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/hidden", strings.NewReader(`{"target":{"kind":"cve","id":"CVE-2024-0002"}}`))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnsupportedMediaType {
+		t.Errorf("form post: status %d", res.StatusCode)
 	}
 }

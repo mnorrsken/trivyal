@@ -5,8 +5,10 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { ago, int, qs, reportHref } from '#lib/format.ts';
-	import type { Counts, ImageUse, SBOMInfo, SecretFinding, Vulnerability, OS } from '#lib/types.ts';
+	import type { Counts, ImageUse, MarkInfo, SBOMInfo, SecretFinding, Vulnerability, OS } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
+	import HideControls from '#lib/components/HideControls.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
@@ -18,6 +20,7 @@
 	interface ImageDetail {
 		key: string;
 		ref: string;
+		name?: string;
 		registry?: string;
 		repository?: string;
 		tag?: string;
@@ -31,15 +34,17 @@
 		secrets: SecretFinding[] | null;
 		secretScanned: boolean;
 		sbom?: SBOMInfo;
+		hidden?: MarkInfo;
 	}
 
 	const key = $derived(page.url.searchParams.get('key') ?? '');
 	const tab = $derived(page.url.searchParams.get('tab') ?? 'vulns');
+	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<ImageDetail>();
 	$effect(() => {
-		const k = key;
+		const p = { key, hidden };
 		live.generation;
-		f.run(() => api<ImageDetail>('image', { key: k }));
+		f.run(() => api<ImageDetail>('image', p));
 	});
 	const d = $derived(f.data);
 	const live_uses = $derived((d?.uses ?? []).filter((u) => !u.workload.stale));
@@ -71,6 +76,9 @@
 			{/if}
 			<span class="pill">{live_uses.length} workload{live_uses.length === 1 ? '' : 's'}</span>
 			<span class="pill">scanned {ago(d.updated)}</span>
+		</div>
+		<div class="ctl">
+			<HideControls target={d.name ? { kind: 'image', image: d.name } : undefined} mark={d.hidden} noun="image" />
 		</div>
 	</header>
 
@@ -110,7 +118,7 @@
 	<section class="card body">
 		{#if tab === 'vulns'}
 			{#if d.vulnerabilities}
-				<VulnTable vulns={d.vulnerabilities} />
+				<VulnTable vulns={d.vulnerabilities} imageName={d.name} />
 			{:else}
 				<Empty title="No vulnerability report for this image" />
 			{/if}
@@ -130,7 +138,7 @@
 		{:else if tab === 'secrets'}
 			{#if d.secrets?.length}
 				<table class="table">
-					<thead><tr><th>Severity</th><th>Rule</th><th>File</th><th>Match</th></tr></thead>
+					<thead><tr><th>Severity</th><th>Rule</th><th>File</th><th>Match</th><th></th></tr></thead>
 					<tbody>
 						{#each d.secrets as s (s.secret.ruleID + s.secret.target + s.secret.match)}
 							<tr>
@@ -138,6 +146,9 @@
 								<td>{s.secret.title}<div class="muted small mono">{s.secret.ruleID}</div></td>
 								<td class="mono small">{s.secret.target}</td>
 								<td class="mono small muted trunc match">{s.secret.match}</td>
+								<td class="r">
+									<HideButton target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} small />
+								</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -180,6 +191,9 @@
 	}
 	.eol {
 		color: var(--sev-critical);
+	}
+	.ctl {
+		margin-top: 12px;
 	}
 	.tiles {
 		display: grid;

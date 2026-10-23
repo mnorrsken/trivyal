@@ -119,6 +119,31 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 		}
 	}
 	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int { return cmp.Compare(a.Container, b.Container) })
+	if s.hidden {
+		// What is hidden can differ per workload: count this workload's rows.
+		byKey := map[string]*WorkloadImage{}
+		for _, wi := range out.Images {
+			wi.Counts, wi.Fixable = reports.SeveritySummary{}, 0
+			byKey[wi.Container+"|"+wi.Key] = wi
+		}
+		seen := map[string]bool{}
+		for _, r := range s.Vulns {
+			if !sameWorkload(r.Use.Workload, res) {
+				continue
+			}
+			k := r.Use.Container + "|" + r.Image.Key
+			wi := byKey[k]
+			fk := k + "|" + findingKey(r.Image, r.V)
+			if wi == nil || seen[fk] {
+				continue
+			}
+			seen[fk] = true
+			wi.Counts.Inc(r.V.Severity)
+			if r.V.FixedVersion != "" {
+				wi.Fixable++
+			}
+		}
+	}
 	for _, r := range s.Checks {
 		if r.Type == CheckConfig && sameWorkload(r.Resource, res) {
 			addRef(r.Report)

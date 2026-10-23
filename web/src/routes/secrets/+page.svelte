@@ -7,6 +7,7 @@
 	import { int } from '#lib/format.ts';
 	import type { List, SecretFinding } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import HideButton from '#lib/components/HideButton.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
@@ -65,6 +66,7 @@
 					<SortTh key="target" current={sort} {onsort}>File</SortTh>
 					<SortTh key="workload" current={sort} {onsort}>Workload</SortTh>
 					<th>Match</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -86,6 +88,9 @@
 							{:else}
 								<button class="btn small" onclick={() => (shown[i] = true)}>Show</button>
 							{/if}
+						</td>
+						<td class="r">
+							<HideButton target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} small />
 						</td>
 					</tr>
 				{/each}

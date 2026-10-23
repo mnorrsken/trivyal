@@ -88,6 +88,9 @@ type Snapshot struct {
 	Scanners     map[string]int
 	Oldest       time.Time
 	Newest       time.Time
+
+	// hidden is set on copies made by Hide.
+	hidden bool
 }
 
 type resolver struct {

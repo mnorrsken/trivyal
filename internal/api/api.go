@@ -10,9 +10,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mnorrsken/trivyal/internal/index"
 	"github.com/mnorrsken/trivyal/internal/query"
+	"github.com/mnorrsken/trivyal/internal/store"
 	"github.com/mnorrsken/trivyal/internal/version"
 )
 
@@ -30,11 +32,15 @@ type Server struct {
 	cluster Cluster
 	hub     *Hub
 	metrics *Metrics
+	store   *store.Store
+
+	mu    sync.Mutex
+	views map[int64]*userView // by user ID
 }
 
 // New returns an API server.
-func New(idx *index.Index, backend Backend, hub *Hub, metrics *Metrics) *Server {
-	return &Server{idx: idx, backend: backend, cluster: backend, hub: hub, metrics: metrics}
+func New(idx *index.Index, backend Backend, hub *Hub, metrics *Metrics, st *store.Store) *Server {
+	return &Server{idx: idx, backend: backend, cluster: backend, hub: hub, metrics: metrics, store: st, views: map[int64]*userView{}}
 }
 
 // Register adds the API routes to mux.
@@ -61,6 +67,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/report/{type}/{ns}/{name}", s.report)
 	mux.HandleFunc("GET /api/v1/search", s.search)
 	s.registerResources(mux)
+	s.registerHidden(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
@@ -78,12 +85,17 @@ func (s *Server) version(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, map[string]string{"version": version.Version, "commit": version.Commit})
 }
 
-func (s *Server) summary(w http.ResponseWriter, _ *http.Request) {
-	sum := s.snapshot().Summary()
+func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
+	snap, uv, ok := s.visible(w, r)
+	if !ok {
+		return
+	}
 	writeJSON(w, struct {
 		*index.Summary
 		Synced bool `json:"synced"`
-	}{sum, s.backend.Synced()})
+		// Hidden is the number of things the user hid.
+		Hidden int `json:"hidden"`
+	}{snap.Summary(), s.backend.Synced(), len(uv.marks)})
 }
 
 func (s *Server) snapshot() *index.Snapshot {

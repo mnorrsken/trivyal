@@ -190,6 +190,7 @@
 	<p class="foot muted">
 		{#each Object.entries(s.reports).filter(([, n]) => n > 0) as [k, n], i (k)}{i ? ' · ' : ''}{n} {k}{/each}
 		{#if s.staleWorkloads}<br />{s.staleWorkloads} old ReplicaSet revisions are hidden from all counts.{/if}
+		{#if s.hidden}<br /><a class="link" href="/hidden">{s.hidden} hidden item{s.hidden === 1 ? '' : 's'}</a> left out of all counts.{/if}
 		{#if s.scanners.length}<br />Scanners: {s.scanners.join(', ')}{/if}
 	</p>
 {/if}
