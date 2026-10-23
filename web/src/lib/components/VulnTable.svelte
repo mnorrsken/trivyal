@@ -79,7 +79,7 @@
 						<td class="mono small">{v.resource}</td>
 						<td class="mono small">{v.installedVersion}</td>
 						<td class="mono small">
-							{#if v.fixedVersion}<span class="fixed">{v.fixedVersion}</span>{:else}<span class="muted">—</span>{/if}
+							{#if v.fixedVersion}<span class="fixed-in">{v.fixedVersion}</span>{:else}<span class="muted">—</span>{/if}
 						</td>
 						<td class="r num">{v.score?.toFixed(1) ?? '—'}</td>
 						<td class="small ink2 num">{date(v.publishedDate)}</td>
@@ -189,7 +189,7 @@
 	.small {
 		font-size: 12px;
 	}
-	.fixed {
+	.fixed-in {
 		color: var(--good-ink);
 	}
 	.detail td {

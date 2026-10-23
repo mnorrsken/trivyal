@@ -72,7 +72,7 @@
 						<td class="mono small">{a.vuln.resource}</td>
 						<td class="mono small">{a.vuln.installedVersion}</td>
 						<td class="mono small">
-							{#if a.vuln.fixedVersion}<span class="fixed">{a.vuln.fixedVersion}</span>{:else}<span class="muted">no fix yet</span>{/if}
+							{#if a.vuln.fixedVersion}<span class="fixed-in">{a.vuln.fixedVersion}</span>{:else}<span class="muted">no fix yet</span>{/if}
 						</td>
 						<td>
 							{#each a.workloads as w (w.kind + w.namespace + w.name)}
@@ -140,7 +140,7 @@
 	.small {
 		font-size: 12px;
 	}
-	.fixed {
+	.fixed-in {
 		color: var(--good-ink);
 	}
 	@media (max-width: 900px) {

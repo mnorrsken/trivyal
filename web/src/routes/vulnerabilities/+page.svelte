@@ -200,7 +200,7 @@
 						<td class="mono small">{x.vuln.resource}</td>
 						<td class="mono small">{x.vuln.installedVersion}</td>
 						<td class="mono small">
-							{#if x.vuln.fixedVersion}<span class="fixed">{x.vuln.fixedVersion}</span>{:else}<span class="muted">—</span>{/if}
+							{#if x.vuln.fixedVersion}<span class="fixed-in">{x.vuln.fixedVersion}</span>{:else}<span class="muted">—</span>{/if}
 						</td>
 						<td class="imgcol">
 							<ImageName ref={x.image} key={x.imageKey} />
@@ -246,7 +246,7 @@
 	.imgcol {
 		max-width: 300px;
 	}
-	.fixed {
+	.fixed-in {
 		color: var(--good-ink);
 	}
 	.eosl {
