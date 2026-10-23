@@ -111,6 +111,10 @@ func (s *Store) migrate(ctx context.Context) error {
 	return nil
 }
 
+// now is the current time at the precision SQLite and PostgreSQL store, so
+// a saved time equals the one read back.
+func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
+
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
 
@@ -122,7 +126,7 @@ func (s *Store) Anonymous() int64 { return s.anon }
 
 // User returns the ID of the user with subject, creating the user if needed.
 func (s *Store) User(ctx context.Context, subject string) (int64, error) {
-	u := &User{Subject: subject, Created: time.Now().UTC()}
+	u := &User{Subject: subject, Created: now()}
 	if _, err := s.db.NewInsert().Model(u).On("CONFLICT (subject) DO NOTHING").Exec(ctx); err != nil {
 		return 0, fmt.Errorf("creating user: %w", err)
 	}
@@ -144,8 +148,8 @@ func (s *Store) Marks(ctx context.Context, userID int64) ([]Mark, error) {
 // PutMark saves m, replacing the user's mark of the same kind and key. ID
 // and Created are kept from the mark it replaces.
 func (s *Store) PutMark(ctx context.Context, m *Mark) error {
-	now := time.Now().UTC()
-	m.Updated = now
+	ts := now()
+	m.Updated = ts
 	if m.Findings == nil {
 		m.Findings = []string{}
 	}
@@ -154,7 +158,7 @@ func (s *Store) PutMark(ctx context.Context, m *Mark) error {
 		err := tx.NewSelect().Model(&old).Where("user_id = ? AND kind = ? AND key = ?", m.UserID, m.Kind, m.Key).Scan(ctx)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			m.ID, m.Created = 0, now
+			m.ID, m.Created = 0, ts
 			_, err = tx.NewInsert().Model(m).Exec(ctx)
 		case err == nil:
 			m.ID, m.Created = old.ID, old.Created
