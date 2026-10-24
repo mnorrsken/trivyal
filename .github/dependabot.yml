@@ -13,6 +13,13 @@ updates:
     directory: /web
     schedule:
       interval: weekly
+    ignore:
+      # svelte-check supports only TypeScript 5 and 6 so far.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Follows the Node major the app is built with (24, LTS).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       web-deps:
         patterns:
@@ -31,3 +38,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Odd Node majors are short-lived; move to the next LTS by hand.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
