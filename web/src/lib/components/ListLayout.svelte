@@ -26,7 +26,8 @@
 		noun,
 		placeholder,
 		showStale = true,
-		showHidden = true,
+		markable = true,
+		hidden = 0,
 		actions,
 		children
 	}: {
@@ -45,7 +46,8 @@
 		noun: string;
 		placeholder?: string;
 		showStale?: boolean;
-		showHidden?: boolean;
+		markable?: boolean;
+		hidden?: number;
 		actions?: Snippet;
 		children: Snippet;
 	} = $props();
@@ -86,10 +88,10 @@
 				Include old ReplicaSets
 			</label>
 		{/if}
-		{#if showHidden}
+		{#if markable}
 			<label class="stale">
-				<input type="checkbox" checked={ls.hidden} onchange={(e) => ls.update({ hidden: e.currentTarget.checked ? '1' : '' })} />
-				Show hidden
+				<input type="checkbox" checked={ls.flagFirst} onchange={(e) => ls.update({ flagfirst: e.currentTarget.checked ? '' : '0' })} />
+				Flagged first
 			</label>
 		{/if}
 	</aside>
@@ -98,7 +100,8 @@
 			<button class="btn facet-toggle" onclick={() => (showFacets = !showFacets)}>Filters</button>
 			<span class="muted num">
 				{int(total)}
-				{noun}{#if rows !== undefined && rows !== total}&nbsp;· {int(rows)} matching rows{/if}
+				{noun}{#if rows !== undefined && rows !== total}&nbsp;· {int(rows)} matching rows{/if}{#if hidden}&nbsp;·
+					<a class="link" href="/marks">{int(hidden)} hidden finding{hidden === 1 ? '' : 's'} not shown</a>{/if}
 			</span>
 		</div>
 		<div class="card tablewrap">

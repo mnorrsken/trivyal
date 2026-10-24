@@ -314,76 +314,97 @@ func send(t *testing.T, srv *httptest.Server, method, path, body string, want in
 	}
 }
 
-func TestHidden(t *testing.T) {
+func TestMarks(t *testing.T) {
 	srv := newTestServer(t)
 	var m MarkInfo
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"image","image":"registry.example.com/shop/web"},"note":"checked"}`, http.StatusOK, &m)
-	if m.ID == 0 || m.Note != "checked" || m.Findings != 5 || m.Hiding != 5 || m.New != 0 {
-		t.Errorf("hide = %+v", m)
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"image","image":"registry.example.com/shop/web"},"state":"hidden","note":"checked"}`, http.StatusOK, &m)
+	if m.ID == 0 || m.State != "hidden" || m.Note != "checked" || m.Counts == nil || m.Counts.Findings != 5 || m.Counts.Now != 5 || m.Counts.New != 0 {
+		t.Errorf("hide = %+v %+v", m, m.Counts)
 	}
 
-	var l list
-	get(t, srv, "/api/v1/vulnerabilities", http.StatusOK, &l)
-	if l.Total != 3 {
-		t.Errorf("images after hiding one: %d, want 3", l.Total)
+	var l struct {
+		list
+		Hidden int `json:"hidden"`
 	}
-	get(t, srv, "/api/v1/vulnerabilities?hidden=1", http.StatusOK, &l)
-	if l.Total != 4 {
-		t.Errorf("images with hidden=1: %d, want 4", l.Total)
+	get(t, srv, "/api/v1/vulnerabilities", http.StatusOK, &l)
+	// The old ReplicaSet's finding is not counted without stale=1.
+	if l.Total != 3 || l.Hidden != 3 {
+		t.Errorf("images after hiding one: %d, %d hidden findings; want 3, 3", l.Total, l.Hidden)
 	}
 	get(t, srv, "/api/v1/secrets", http.StatusOK, &l)
-	if l.Total != 1 {
-		t.Errorf("secrets after hiding the image: %d, want 1", l.Total)
+	if l.Total != 1 || l.Hidden != 1 {
+		t.Errorf("secrets after hiding the image: %d, %d hidden", l.Total, l.Hidden)
 	}
 	var img ImageDetail
 	get(t, srv, "/api/v1/image?key=sha256:aaa", http.StatusOK, &img)
-	if img.Hidden == nil || img.Hidden.ID != m.ID || img.Vulnerabilities == nil || len(img.Vulnerabilities) != 0 || img.Summary.Total() != 0 {
-		t.Errorf("hidden image detail: mark %+v, %d vulns", img.Hidden, len(img.Vulnerabilities))
-	}
-	var s struct {
-		index.Summary
-		Hidden int `json:"hidden"`
-	}
-	get(t, srv, "/api/v1/summary", http.StatusOK, &s)
-	if s.Hidden != 1 || s.Vulns.Images != 3 {
-		t.Errorf("summary: hidden %d, images %d", s.Hidden, s.Vulns.Images)
+	if img.HiddenFindings != 5 || img.Vulnerabilities == nil || len(img.Vulnerabilities) != 0 || img.Summary.Total() != 0 {
+		t.Errorf("hidden image detail: %d hidden, %d vulns", img.HiddenFindings, len(img.Vulnerabilities))
 	}
 
 	// A hidden CVE still has a page, with nothing affected.
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"cve","id":"CVE-2024-0001"}}`, http.StatusOK, nil)
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"cve","id":"CVE-2024-0001"},"state":"hidden"}`, http.StatusOK, nil)
 	var cve CVEDetail
 	get(t, srv, "/api/v1/cve/CVE-2024-0001", http.StatusOK, &cve)
-	if cve.Hidden == nil || len(cve.Affected) != 0 {
-		t.Errorf("hidden cve: mark %+v, %d affected", cve.Hidden, len(cve.Affected))
+	if cve.HiddenFindings != 1 || len(cve.Affected) != 0 {
+		t.Errorf("hidden cve: %d hidden, %d affected", cve.HiddenFindings, len(cve.Affected))
 	}
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"check","type":"config","id":"avd-ksv-0014"}}`, http.StatusOK, nil)
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"check","type":"config","id":"avd-ksv-0014"},"state":"hidden"}`, http.StatusOK, nil)
 	var chk CheckDetail
 	get(t, srv, "/api/v1/checks/config/AVD-KSV-0014", http.StatusOK, &chk)
-	if chk.Hidden == nil || len(chk.Resources) != 0 {
-		t.Errorf("hidden check: mark %+v, %d resources", chk.Hidden, len(chk.Resources))
+	if chk.HiddenFindings != 1 || len(chk.Resources) != 0 {
+		t.Errorf("hidden check: %d hidden, %d resources", chk.HiddenFindings, len(chk.Resources))
 	}
 
-	// Hiding again without a note keeps the note.
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"image","image":"registry.example.com/shop/web"}}`, http.StatusOK, &m)
-	if m.Note != "checked" {
-		t.Errorf("note after hiding again = %q", m.Note)
+	// Flagging the hidden image instead keeps the note and shows it again,
+	// first in the list.
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"image","image":"registry.example.com/shop/web"},"state":"flagged"}`, http.StatusOK, &m)
+	if m.Note != "checked" || m.State != "flagged" {
+		t.Errorf("flag = %+v", m)
 	}
+	get(t, srv, "/api/v1/vulnerabilities?sort=image", http.StatusOK, &l)
+	if l.Total != 4 || l.Items[0]["key"] != "sha256:aaa" || l.Items[0]["flagged"] != true {
+		t.Errorf("flagged image not first: %+v", l.Items)
+	}
+	get(t, srv, "/api/v1/vulnerabilities?sort=image&flagfirst=0", http.StatusOK, &l)
+	if l.Items[0]["key"] == "sha256:aaa" {
+		t.Errorf("flagfirst=0 still sorts flagged first: %+v", l.Items[0])
+	}
+	var wl list
+	get(t, srv, "/api/v1/workloads?sort=name", http.StatusOK, &wl)
+	if wl.Items[0]["name"] != "web" || wl.Items[0]["flagged"] != true {
+		t.Errorf("workload running the flagged image not first: %+v", wl.Items[0])
+	}
+	// A flag can go on a clean target.
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"namespace","namespace":"demo"},"state":"flagged"}`, http.StatusOK, nil)
+	var nss []NamespaceRow
+	get(t, srv, "/api/v1/namespaces", http.StatusOK, &nss)
+	// shop runs the flagged image, so it is flagged too.
+	if len(nss) != 2 || !nss[0].Flagged || !nss[1].Flagged {
+		t.Errorf("flagged namespaces: %+v", nss)
+	}
+
 	var all []MarkInfo
-	get(t, srv, "/api/v1/hidden", http.StatusOK, &all)
-	if len(all) != 3 || all[0].ID != m.ID {
-		t.Errorf("hidden list = %+v", all)
+	get(t, srv, "/api/v1/marks", http.StatusOK, &all)
+	if len(all) != 4 || all[0].Counts != nil {
+		t.Errorf("marks = %+v", all)
+	}
+	var s struct {
+		index.Summary
+		Hidden  int `json:"hidden"`
+		Flagged int `json:"flagged"`
+	}
+	get(t, srv, "/api/v1/summary", http.StatusOK, &s)
+	if s.Hidden != 2 || s.Flagged != 2 {
+		t.Errorf("summary: hidden %d, flagged %d", s.Hidden, s.Flagged)
 	}
 
-	send(t, srv, "DELETE", "/api/v1/hidden/"+strconv.FormatInt(m.ID, 10), "", http.StatusNoContent, nil)
-	send(t, srv, "DELETE", "/api/v1/hidden/"+strconv.FormatInt(m.ID, 10), "", http.StatusNotFound, nil)
-	get(t, srv, "/api/v1/vulnerabilities?q=-cve:CVE-2024-0001", http.StatusOK, &l)
-	if l.Total != 4 {
-		t.Errorf("images after unhiding: %d, want 4", l.Total)
-	}
+	send(t, srv, "DELETE", "/api/v1/marks/"+strconv.FormatInt(m.ID, 10), "", http.StatusNoContent, nil)
+	send(t, srv, "DELETE", "/api/v1/marks/"+strconv.FormatInt(m.ID, 10), "", http.StatusNotFound, nil)
 
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"namespace","namespace":"nowhere"}}`, http.StatusNotFound, nil)
-	send(t, srv, "POST", "/api/v1/hidden", `{"target":{"kind":"bogus"}}`, http.StatusBadRequest, nil)
-	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/hidden", strings.NewReader(`{"target":{"kind":"cve","id":"CVE-2024-0002"}}`))
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"namespace","namespace":"nowhere"},"state":"hidden"}`, http.StatusNotFound, nil)
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"cve","id":"CVE-2024-0002"},"state":"gone"}`, http.StatusBadRequest, nil)
+	send(t, srv, "POST", "/api/v1/marks", `{"target":{"kind":"bogus"},"state":"hidden"}`, http.StatusBadRequest, nil)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/marks", strings.NewReader(`{"target":{"kind":"cve","id":"CVE-2024-0002"},"state":"hidden"}`))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

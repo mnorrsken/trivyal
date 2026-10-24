@@ -67,7 +67,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/report/{type}/{ns}/{name}", s.report)
 	mux.HandleFunc("GET /api/v1/search", s.search)
 	s.registerResources(mux)
-	s.registerHidden(mux)
+	s.registerMarks(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
@@ -90,12 +90,19 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	hidden := 0
+	for _, m := range uv.marks {
+		if m.State == store.Hidden {
+			hidden++
+		}
+	}
 	writeJSON(w, struct {
 		*index.Summary
 		Synced bool `json:"synced"`
-		// Hidden is the number of things the user hid.
-		Hidden int `json:"hidden"`
-	}{snap.Summary(), s.backend.Synced(), len(uv.marks)})
+		// Hidden and Flagged count the things the user hid and flagged.
+		Hidden  int `json:"hidden"`
+		Flagged int `json:"flagged"`
+	}{snap.Summary(), s.backend.Synced(), hidden, len(uv.marks) - hidden})
 }
 
 func (s *Server) snapshot() *index.Snapshot {
@@ -137,6 +144,8 @@ type listParams struct {
 	page  int
 	size  int
 	stale bool
+	// flagFirst sorts flagged items first; on unless ?flagfirst=0.
+	flagFirst bool
 }
 
 func parseList(r *http.Request, schema query.Schema) (listParams, error) {
@@ -153,6 +162,7 @@ func parseList(r *http.Request, schema query.Schema) (listParams, error) {
 		p.size = min(n, 1000)
 	}
 	p.stale = v.Get("stale") == "1" || v.Get("stale") == "true"
+	p.flagFirst = v.Get("flagfirst") != "0"
 	return p, nil
 }
 
@@ -167,9 +177,12 @@ type List struct {
 	Facets map[string][]query.FacetValue `json:"facets,omitempty"`
 	// Rows is the number of matching rows before grouping.
 	Rows int `json:"rows"`
+	// Hidden is the number of matching findings the user hid.
+	Hidden int `json:"hidden"`
 }
 
-// page sorts items with sortKey ("-" prefix reverses) and returns one page.
+// page sorts items with sortKey ("-" prefix reverses), flagged items first
+// unless turned off, and returns one page.
 func page[T any](items []T, sortKey, def string, sorts map[string]func(a, b T) int, p listParams) ([]T, string) {
 	fn, ok := sorts[strings.TrimPrefix(sortKey, "-")]
 	if !ok {
@@ -179,6 +192,16 @@ func page[T any](items []T, sortKey, def string, sorts map[string]func(a, b T) i
 		slices.SortStableFunc(items, func(a, b T) int { return -fn(a, b) })
 	} else {
 		slices.SortStableFunc(items, fn)
+	}
+	if p.flagFirst {
+		slices.SortStableFunc(items, func(a, b T) int {
+			fa, _ := any(a).(interface{ IsFlagged() bool })
+			fb, _ := any(b).(interface{ IsFlagged() bool })
+			if fa == nil || fb == nil {
+				return 0
+			}
+			return index.FlaggedFirst(fa, fb)
+		})
 	}
 	start := (p.page - 1) * p.size
 	if start >= len(items) {

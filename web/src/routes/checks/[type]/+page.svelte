@@ -9,7 +9,7 @@
 	import { checkTypes } from '#lib/checks.ts';
 	import type { CheckFinding, CheckGroup, List, ResourceGroup } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideButton from '#lib/components/HideButton.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
@@ -70,6 +70,7 @@
 	loading={f.loading}
 	noun={nouns[d?.group ?? ls.group] ?? 'results'}
 	placeholder={info.placeholder}
+	hidden={d?.hidden}
 	showStale={type === 'config'}
 >
 	{#if d && d.items.length === 0}
@@ -83,6 +84,7 @@
 					<SortTh key="namespace" current={sort} {onsort}>Resource</SortTh>
 					<SortTh key="severity" current={sort} {onsort}>Failed checks</SortTh>
 					<th>Report</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -94,6 +96,7 @@
 							<SevBar counts={g.counts} {max} height={5} showUnknown={false} />
 						</td>
 						<td class="small"><a class="link" href={reportHref(g.report)}>details</a></td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'workload', resource: g.resource }} contains={g.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -106,6 +109,7 @@
 					<SortTh key="id" current={sort} {onsort}>Check</SortTh>
 					<SortTh key="title" current={sort} {onsort}>Title</SortTh>
 					<SortTh key="failed" current={sort} {onsort} align="right">Failing</SortTh>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -120,6 +124,7 @@
 						<td class="r num">
 							<a class="link" href={qs({ q: `check:${g.id}` + (ls.q ? ' ' + ls.q : '') })}>{g.failed}</a>
 						</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'check', type, id: g.id }} contains={g.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -145,9 +150,9 @@
 						</td>
 						<td class="main"><WorkloadLink w={x.resource} /></td>
 						<td class="small ink2 msg">{x.check.messages?.join(' ') ?? ''}</td>
-						<td class="r">
+						<td class="r mark-col">
 							{#if !x.check.success}
-								<HideButton target={{ kind: 'resource-check', type, id: x.check.checkID, resource: x.resource }} small />
+								<MarkMenu target={{ kind: 'resource-check', type, id: x.check.checkID, resource: x.resource }} contains={x.flagged} row />
 							{/if}
 						</td>
 					</tr>

@@ -1,4 +1,4 @@
-// Package store keeps what users mark in the UI (hidden findings) in a SQL
+// Package store keeps what users mark in the UI (flagged and hidden) in a SQL
 // database. It goes through bun, so the same code can run on PostgreSQL
 // later; only SQLite is wired up for now.
 package store
@@ -32,9 +32,16 @@ type User struct {
 	Created time.Time `bun:",notnull"`
 }
 
-// Mark hides one target (an image, a CVE, a workload...) for one user.
-// Kind and Key name the target; Findings are the finding IDs it had when it
-// was hidden, so findings that turn up later show again.
+// Mark states.
+const (
+	Hidden  = "hidden"
+	Flagged = "flagged"
+)
+
+// Mark flags or hides one target (an image, a CVE, a workload...) for one
+// user. Kind and Key name the target; Findings are the finding IDs it had
+// when it was marked, so findings that turn up later in a hidden target
+// show again.
 type Mark struct {
 	bun.BaseModel `bun:"table:marks"`
 
@@ -42,6 +49,7 @@ type Mark struct {
 	UserID   int64     `bun:",notnull"`
 	Kind     string    `bun:",notnull"`
 	Key      string    `bun:",notnull"`
+	State    string    `bun:",notnull"`
 	Note     string    `bun:",notnull"`
 	Findings []string  `bun:",notnull"`
 	Created  time.Time `bun:",notnull"`
@@ -162,7 +170,7 @@ func (s *Store) PutMark(ctx context.Context, m *Mark) error {
 			_, err = tx.NewInsert().Model(m).Exec(ctx)
 		case err == nil:
 			m.ID, m.Created = old.ID, old.Created
-			_, err = tx.NewUpdate().Model(m).Column("note", "findings", "updated").WherePK().Exec(ctx)
+			_, err = tx.NewUpdate().Model(m).Column("state", "note", "findings", "updated").WherePK().Exec(ctx)
 		}
 		return err
 	})

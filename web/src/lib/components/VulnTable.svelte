@@ -1,10 +1,12 @@
 <script lang="ts">
 	// Vulnerabilities of one image, filtered in the browser (lists are small).
-	// With imageName, an opened row can hide its CVE in this image.
+	// With imageName, rows can flag or hide their CVE in this image, and
+	// flagged CVEs come first.
 	import { date, sevLabel, severities } from '../format';
+	import { marks } from '../marks.svelte';
 	import type { Vulnerability } from '../types';
 	import Empty from './Empty.svelte';
-	import HideButton from './HideButton.svelte';
+	import MarkMenu from './MarkMenu.svelte';
 	import SevBadge from './SevBadge.svelte';
 
 	let { vulns, imageName }: { vulns: Vulnerability[]; imageName?: string } = $props();
@@ -18,9 +20,13 @@
 	const counts = $derived(
 		Object.fromEntries(severities.map((s) => [s, vulns.filter((v) => v.severity === s).length]))
 	);
+	const flagged = (v: Vulnerability) =>
+		!!imageName &&
+		(marks.get({ kind: 'image-cve', image: imageName, id: v.vulnerabilityID })?.state === 'flagged' ||
+			marks.get({ kind: 'cve', id: v.vulnerabilityID })?.state === 'flagged');
 	const rows = $derived.by(() => {
 		const t = text.trim().toLowerCase();
-		return vulns.filter(
+		const out = vulns.filter(
 			(v) =>
 				(!sev.length || sev.includes(v.severity)) &&
 				(!fixable || !!v.fixedVersion) &&
@@ -29,6 +35,8 @@
 					v.resource.toLowerCase().includes(t) ||
 					(v.title ?? '').toLowerCase().includes(t))
 		);
+		// Stable: flagged first, then the server's order.
+		return [...out.filter(flagged), ...out.filter((v) => !flagged(v))];
 	});
 
 	function toggleSev(s: string) {
@@ -66,6 +74,7 @@
 					<th>Fixed in</th>
 					<th class="r">Score</th>
 					<th>Published</th>
+					{#if imageName}<th></th>{/if}
 				</tr>
 			</thead>
 			<tbody>
@@ -85,10 +94,15 @@
 						</td>
 						<td class="r num">{v.score?.toFixed(1) ?? '—'}</td>
 						<td class="small ink2 num">{date(v.publishedDate)}</td>
+						{#if imageName}
+							<td class="r mark-col">
+								<MarkMenu target={{ kind: 'image-cve', image: imageName, id: v.vulnerabilityID }} contains={flagged(v)} row />
+							</td>
+						{/if}
 					</tr>
 					{#if open === key(v)}
 						<tr class="detail">
-							<td colspan="7">
+							<td colspan={imageName ? 8 : 7}>
 								{#if v.description}<p class="prose-sm">{v.description}</p>{/if}
 								<dl>
 									{#if v.target}<dt>Target</dt><dd class="mono">{v.target}</dd>{/if}
@@ -99,11 +113,6 @@
 											<a class="link" href={v.primaryLink} target="_blank" rel="noreferrer">{v.primaryLink}</a>
 										</dd>{/if}
 								</dl>
-								{#if imageName}
-									<div class="hide">
-										<HideButton target={{ kind: 'image-cve', image: imageName, id: v.vulnerabilityID }} label="Hide in this image" small />
-									</div>
-								{/if}
 							</td>
 						</tr>
 					{/if}
@@ -218,7 +227,5 @@
 	.more {
 		margin: 12px;
 	}
-	.hide {
-		margin-top: 10px;
-	}
+
 </style>

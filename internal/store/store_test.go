@@ -26,20 +26,20 @@ func TestMarks(t *testing.T) {
 		t.Fatal("no anonymous user")
 	}
 
-	m := &Mark{UserID: uid, Kind: "image", Key: "registry.example.com/shop/web", Note: "checked", Findings: []string{"a", "b"}}
+	m := &Mark{UserID: uid, Kind: "image", Key: "registry.example.com/shop/web", State: Hidden, Note: "checked", Findings: []string{"a", "b"}}
 	if err := s.PutMark(ctx, m); err != nil {
 		t.Fatal(err)
 	}
 	v := s.Version()
 	// Same kind and key: replaced, ID and Created kept.
-	again := &Mark{UserID: uid, Kind: "image", Key: "registry.example.com/shop/web", Note: "rechecked", Findings: []string{"a", "b", "c"}}
+	again := &Mark{UserID: uid, Kind: "image", Key: "registry.example.com/shop/web", State: Flagged, Note: "rechecked", Findings: []string{"a", "b", "c"}}
 	if err := s.PutMark(ctx, again); err != nil {
 		t.Fatal(err)
 	}
 	if again.ID != m.ID || !again.Created.Equal(m.Created) || s.Version() == v {
 		t.Errorf("upsert: id %d/%d created %v/%v version %d/%d", again.ID, m.ID, again.Created, m.Created, s.Version(), v)
 	}
-	if err := s.PutMark(ctx, &Mark{UserID: uid, Kind: "cve", Key: "CVE-2024-0001"}); err != nil {
+	if err := s.PutMark(ctx, &Mark{UserID: uid, Kind: "cve", Key: "CVE-2024-0001", State: Hidden}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestMarks(t *testing.T) {
 	if again, _ := s.User(ctx, "someone"); again != other || other == uid {
 		t.Errorf("user ids: %d, %d, anonymous %d", other, again, uid)
 	}
-	if err := s.PutMark(ctx, &Mark{UserID: other, Kind: "cve", Key: "CVE-2024-0001"}); err != nil {
+	if err := s.PutMark(ctx, &Mark{UserID: other, Kind: "cve", Key: "CVE-2024-0001", State: Flagged}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,7 +64,7 @@ func TestMarks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 || list[1].Note != "rechecked" || !slices.Equal(list[1].Findings, []string{"a", "b", "c"}) || list[0].Findings == nil {
+	if len(list) != 2 || list[1].Note != "rechecked" || list[1].State != Flagged || list[0].State != Hidden || !slices.Equal(list[1].Findings, []string{"a", "b", "c"}) || list[0].Findings == nil {
 		t.Fatalf("marks = %+v", list)
 	}
 
@@ -85,5 +85,22 @@ func TestOpenURL(t *testing.T) {
 		if _, err := Open(context.Background(), url); err == nil {
 			t.Errorf("Open(%q) did not fail", url)
 		}
+	}
+}
+
+// Marks saved before marks had a state are hides.
+func TestStateDefault(t *testing.T) {
+	ctx := context.Background()
+	s := open(t, "")
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO marks (user_id, kind, key, note, findings, created, updated)
+		VALUES (?, 'cve', 'CVE-2024-0001', '', '[]', ?, ?)`, s.Anonymous(), now(), now()); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.Marks(ctx, s.Anonymous())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].State != Hidden {
+		t.Errorf("marks = %+v", list)
 	}
 }

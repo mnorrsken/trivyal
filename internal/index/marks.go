@@ -8,20 +8,20 @@ import (
 	"github.com/mnorrsken/trivyal/internal/reports"
 )
 
-// Kinds of targets a user can hide.
+// Kinds of targets a user can flag or hide.
 const (
-	HideImage         = "image"          // Image (repository without tag)
-	HideImageCVE      = "image-cve"      // ID in Image
-	HideCVE           = "cve"            // ID everywhere
-	HideSecret        = "secret"         // Rule in File of Image
-	HideCheck         = "check"          // Type and ID everywhere
-	HideResourceCheck = "resource-check" // Type and ID on Resource
-	HideWorkload      = "workload"       // everything found on Resource
-	HideNamespace     = "namespace"      // everything found in Namespace
+	TargetImage         = "image"          // Image (repository without tag)
+	TargetImageCVE      = "image-cve"      // ID in Image
+	TargetCVE           = "cve"            // ID everywhere
+	TargetSecret        = "secret"         // Rule in File of Image
+	TargetCheck         = "check"          // Type and ID everywhere
+	TargetResourceCheck = "resource-check" // Type and ID on Resource
+	TargetWorkload      = "workload"       // everything found on Resource
+	TargetNamespace     = "namespace"      // everything found in Namespace
 )
 
-// Target is something a user can hide. Only the fields its kind needs are
-// set.
+// Target is something a user can flag or hide. Only the fields its kind
+// needs are set.
 type Target struct {
 	Kind      string            `json:"kind"`
 	Image     string            `json:"image,omitempty"`
@@ -48,23 +48,23 @@ func (t Target) Key() (string, error) {
 		return t.Resource.String()
 	}
 	switch t.Kind {
-	case HideImage:
+	case TargetImage:
 		return t.Image, need(t.Image)
-	case HideImageCVE:
+	case TargetImageCVE:
 		return t.Image + "|" + t.ID, need(t.Image, t.ID)
-	case HideCVE:
+	case TargetCVE:
 		return t.ID, need(t.ID)
-	case HideSecret:
+	case TargetSecret:
 		return t.Image + "|" + t.Rule + "|" + t.File, need(t.Image, t.Rule, t.File)
-	case HideCheck:
+	case TargetCheck:
 		return t.Type + "|" + strings.ToUpper(t.ID), need(t.Type, t.ID)
-	case HideResourceCheck:
+	case TargetResourceCheck:
 		r := res()
 		return t.Type + "|" + strings.ToUpper(t.ID) + "|" + r, need(t.Type, t.ID, r)
-	case HideWorkload:
+	case TargetWorkload:
 		r := res()
 		return r, need(r)
-	case HideNamespace:
+	case TargetNamespace:
 		return t.Namespace, need(t.Namespace)
 	}
 	return "", fmt.Errorf("unknown target kind %q", t.Kind)
@@ -75,28 +75,28 @@ func ParseTarget(kind, key string) (Target, error) {
 	t := Target{Kind: kind}
 	var ok bool
 	switch kind {
-	case HideImage:
+	case TargetImage:
 		t.Image, ok = key, key != ""
-	case HideImageCVE:
+	case TargetImageCVE:
 		t.Image, t.ID, ok = strings.Cut(key, "|")
-	case HideCVE:
+	case TargetCVE:
 		t.ID, ok = key, key != ""
-	case HideSecret:
+	case TargetSecret:
 		p := strings.SplitN(key, "|", 3)
 		if ok = len(p) == 3; ok {
 			t.Image, t.Rule, t.File = p[0], p[1], p[2]
 		}
-	case HideCheck:
+	case TargetCheck:
 		t.Type, t.ID, ok = strings.Cut(key, "|")
-	case HideResourceCheck:
+	case TargetResourceCheck:
 		p := strings.SplitN(key, "|", 3)
 		if ok = len(p) == 3; ok {
 			t.Type, t.ID = p[0], p[1]
 			t.Resource, ok = parseResource(p[2])
 		}
-	case HideWorkload:
+	case TargetWorkload:
 		t.Resource, ok = parseResource(key)
-	case HideNamespace:
+	case TargetNamespace:
 		t.Namespace, ok = key, key != ""
 	}
 	if !ok {
@@ -116,10 +116,12 @@ func parseResource(s string) (*reports.Resource, bool) {
 	return nil, false
 }
 
-// Mark is a hidden target with the IDs of the findings it had when it was
-// hidden. Findings that show up in the target later are not hidden.
+// Mark flags or hides a target. A hide covers the findings the target had
+// when it was hidden (Findings), so findings that show up later are not
+// hidden. A flag covers everything in the target, now and later.
 type Mark struct {
 	Target   Target
+	Flag     bool
 	Findings map[string]bool
 }
 
@@ -142,15 +144,15 @@ func (r *CheckRow) findingID() string {
 // "" when no target of the kind does.
 func (r *VulnRow) scope(kind string) string {
 	switch kind {
-	case HideImage:
+	case TargetImage:
 		return r.Image.Name
-	case HideImageCVE:
+	case TargetImageCVE:
 		return r.Image.Name + "|" + r.V.ID
-	case HideCVE:
+	case TargetCVE:
 		return r.V.ID
-	case HideWorkload:
+	case TargetWorkload:
 		return r.Use.Workload.String()
-	case HideNamespace:
+	case TargetNamespace:
 		return r.Use.Workload.Namespace
 	}
 	return ""
@@ -158,13 +160,13 @@ func (r *VulnRow) scope(kind string) string {
 
 func (r *SecretRow) scope(kind string) string {
 	switch kind {
-	case HideImage:
+	case TargetImage:
 		return r.Scan.ImageName
-	case HideSecret:
+	case TargetSecret:
 		return r.Scan.ImageName + "|" + r.S.RuleID + "|" + r.S.Target
-	case HideWorkload:
+	case TargetWorkload:
 		return r.Scan.Workload.String()
-	case HideNamespace:
+	case TargetNamespace:
 		return r.Scan.Workload.Namespace
 	}
 	return ""
@@ -175,53 +177,72 @@ func (r *CheckRow) scope(kind string) string {
 		return "" // only failed checks are findings
 	}
 	switch kind {
-	case HideCheck:
+	case TargetCheck:
 		return r.Type + "|" + strings.ToUpper(r.C.ID)
-	case HideResourceCheck:
+	case TargetResourceCheck:
 		return r.Type + "|" + strings.ToUpper(r.C.ID) + "|" + r.Resource.String()
-	case HideWorkload:
+	case TargetWorkload:
 		return r.Resource.String()
-	case HideNamespace:
+	case TargetNamespace:
 		return r.Resource.Namespace
 	}
 	return ""
 }
 
-type hideable interface {
+type markable interface {
 	scope(kind string) string
 	findingID() string
 }
 
 var (
-	vulnKinds   = []string{HideImage, HideImageCVE, HideCVE, HideWorkload, HideNamespace}
-	secretKinds = []string{HideImage, HideSecret, HideWorkload, HideNamespace}
-	checkKinds  = []string{HideCheck, HideResourceCheck, HideWorkload, HideNamespace}
+	vulnKinds   = []string{TargetImage, TargetImageCVE, TargetCVE, TargetWorkload, TargetNamespace}
+	secretKinds = []string{TargetImage, TargetSecret, TargetWorkload, TargetNamespace}
+	checkKinds  = []string{TargetCheck, TargetResourceCheck, TargetWorkload, TargetNamespace}
 )
 
 // marks indexes marks by kind and key.
 type marks map[string]map[string]*Mark
 
-func (ms marks) hidden(r hideable, kinds []string) bool {
-	id := ""
+func (ms marks) add(m *Mark) {
+	key, err := m.Target.Key()
+	if err != nil {
+		return
+	}
+	if ms[m.Target.Kind] == nil {
+		ms[m.Target.Kind] = map[string]*Mark{}
+	}
+	ms[m.Target.Kind][key] = m
+}
+
+// find returns the first mark of kinds covering r for which match is true.
+func (ms marks) find(r markable, kinds []string, match func(*Mark) bool) bool {
 	for _, k := range kinds {
-		byKey := ms[k]
-		if len(byKey) == 0 {
+		if len(ms[k]) == 0 {
 			continue
 		}
-		key := r.scope(k)
-		if key == "" {
-			continue
-		}
-		if m := byKey[key]; m != nil {
-			if id == "" {
-				id = r.findingID()
-			}
-			if m.Findings[id] {
+		if key := r.scope(k); key != "" {
+			if m := ms[k][key]; m != nil && match(m) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// hidden reports whether a hide covers the finding of r.
+func (ms marks) hidden(r markable, kinds []string) bool {
+	id := ""
+	return ms.find(r, kinds, func(m *Mark) bool {
+		if id == "" {
+			id = r.findingID()
+		}
+		return m.Findings[id]
+	})
+}
+
+// flagged reports whether a flag covers r.
+func (ms marks) flagged(r markable, kinds []string) bool {
+	return ms.find(r, kinds, func(*Mark) bool { return true })
 }
 
 // Findings returns the IDs of the findings target t covers now, sorted.
@@ -231,7 +252,7 @@ func (s *Snapshot) Findings(t Target) ([]string, error) {
 		return nil, err
 	}
 	set := map[string]bool{}
-	add := func(r hideable) {
+	add := func(r markable) {
 		if r.scope(t.Kind) == key {
 			set[r.findingID()] = true
 		}
@@ -253,37 +274,59 @@ func (s *Snapshot) Findings(t Target) ([]string, error) {
 	return out, nil
 }
 
-// Hide returns a copy of the snapshot without the findings that list
-// hides. Counts of images that lost findings are redone from the rows
-// that are left.
-func (s *Snapshot) Hide(list []Mark) *Snapshot {
-	ms := marks{}
-	for i := range list {
-		m := &list[i]
-		key, err := m.Target.Key()
-		if err != nil {
-			continue
+// filterRows drops the rows hidden finds and copies the rows flagged finds
+// with flag set; the original rows are shared with other users' views.
+func filterRows[R any](rows []R, hidden, flagged func(R) bool, flag func(R) R) []R {
+	out := make([]R, 0, len(rows))
+	for _, r := range rows {
+		switch {
+		case hidden(r):
+		case flagged(r):
+			out = append(out, flag(r))
+		default:
+			out = append(out, r)
 		}
-		if ms[m.Target.Kind] == nil {
-			ms[m.Target.Kind] = map[string]*Mark{}
-		}
-		ms[m.Target.Kind][key] = m
 	}
-	if len(ms) == 0 {
+	return out
+}
+
+// Apply returns a copy of the snapshot without the findings that list
+// hides and with the findings it flags marked as flagged. A hide wins over
+// a flag. Counts of images that lost findings are redone from the rows that
+// are left.
+func (s *Snapshot) Apply(list []Mark) *Snapshot {
+	hides, flags := marks{}, marks{}
+	for i := range list {
+		if list[i].Flag {
+			flags.add(&list[i])
+		} else {
+			hides.add(&list[i])
+		}
+	}
+	if len(hides) == 0 && len(flags) == 0 {
 		return s
 	}
 	v := *s
-	v.hidden = true
+	v.hidden, v.flags = len(hides) > 0, len(flags) > 0
 	touched := map[string]bool{}
-	v.Vulns = slices.DeleteFunc(slices.Clone(s.Vulns), func(r *VulnRow) bool {
-		h := ms.hidden(r, vulnKinds)
-		if h {
-			touched[r.Image.Key] = true
-		}
-		return h
-	})
-	v.Secrets = slices.DeleteFunc(slices.Clone(s.Secrets), func(r *SecretRow) bool { return ms.hidden(r, secretKinds) })
-	v.Checks = slices.DeleteFunc(slices.Clone(s.Checks), func(r *CheckRow) bool { return ms.hidden(r, checkKinds) })
+	v.Vulns = filterRows(s.Vulns,
+		func(r *VulnRow) bool {
+			h := hides.hidden(r, vulnKinds)
+			if h {
+				touched[r.Image.Key] = true
+			}
+			return h
+		},
+		func(r *VulnRow) bool { return flags.flagged(r, vulnKinds) },
+		func(r *VulnRow) *VulnRow { c := *r; c.flagged = true; return &c })
+	v.Secrets = filterRows(s.Secrets,
+		func(r *SecretRow) bool { return hides.hidden(r, secretKinds) },
+		func(r *SecretRow) bool { return flags.flagged(r, secretKinds) },
+		func(r *SecretRow) *SecretRow { c := *r; c.flagged = true; return &c })
+	v.Checks = filterRows(s.Checks,
+		func(r *CheckRow) bool { return hides.hidden(r, checkKinds) },
+		func(r *CheckRow) bool { return flags.flagged(r, checkKinds) },
+		func(r *CheckRow) *CheckRow { c := *r; c.flagged = true; return &c })
 	if len(touched) == 0 {
 		return &v
 	}

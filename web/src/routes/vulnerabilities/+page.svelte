@@ -7,7 +7,7 @@
 	import { date, imageHref, qs, shortDigest, total } from '#lib/format.ts';
 	import type { CVEGroup, Finding, ImageGroup, List, WorkloadGroup } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideButton from '#lib/components/HideButton.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
@@ -34,7 +34,7 @@
 		Math.max(1, ...((d?.items ?? []) as (ImageGroup | WorkloadGroup)[]).map((i) => (i.counts ? total(i.counts) : 0)))
 	);
 	const csvHref = $derived(
-		'/api/v1/vulnerabilities.csv' + qs({ q: ls.q, stale: ls.stale ? '1' : undefined, hidden: ls.hidden ? '1' : undefined })
+		'/api/v1/vulnerabilities.csv' + qs({ q: ls.q, stale: ls.stale ? '1' : undefined })
 	);
 
 	const groups = [
@@ -70,6 +70,7 @@
 	error={f.error}
 	loading={f.loading}
 	noun={nouns[d?.group ?? ls.group] ?? 'results'}
+	hidden={d?.hidden}
 	placeholder="sev:critical,high fixable:yes ns:demo openssl"
 >
 	{#snippet actions()}
@@ -89,6 +90,7 @@
 					<SortTh key="fixable" current={sort} {onsort} align="right">Fixable</SortTh>
 					<SortTh key="workloads" current={sort} {onsort}>Used by</SortTh>
 					<th>OS</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -116,6 +118,7 @@
 							{g.os.name ?? ''}
 							{#if g.os.eosl}<span class="pill eosl" title="The OS release no longer gets security updates">EOL</span>{/if}
 						</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'image', image: g.name }} contains={g.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -128,6 +131,7 @@
 					<SortTh key="severity" current={sort} {onsort}>Findings</SortTh>
 					<SortTh key="fixable" current={sort} {onsort} align="right">Fixable</SortTh>
 					<th>Images</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -144,6 +148,7 @@
 								<div><ImageName {ref} link={false} /></div>
 							{/each}
 						</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'workload', resource: g.workload }} contains={g.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -159,6 +164,7 @@
 					<SortTh key="images" current={sort} {onsort} align="right">Images</SortTh>
 					<SortTh key="workloads" current={sort} {onsort} align="right">Workloads</SortTh>
 					<SortTh key="published" current={sort} {onsort}>Published</SortTh>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -175,6 +181,7 @@
 						<td class="r num">{g.images}</td>
 						<td class="r num">{g.workloads}</td>
 						<td class="num small ink2">{date(g.published)}</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'cve', id: g.id }} contains={g.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -211,8 +218,8 @@
 							<div class="muted small">{x.workloads.length} workload{x.workloads.length === 1 ? '' : 's'}</div>
 						</td>
 						<td class="r num">{x.vuln.score?.toFixed(1) ?? '—'}</td>
-						<td class="r">
-							<HideButton target={{ kind: 'image-cve', image: x.imageName, id: x.vuln.vulnerabilityID }} small />
+						<td class="r mark-col">
+							<MarkMenu target={{ kind: 'image-cve', image: x.imageName, id: x.vuln.vulnerabilityID }} contains={x.flagged} row />
 						</td>
 					</tr>
 				{/each}

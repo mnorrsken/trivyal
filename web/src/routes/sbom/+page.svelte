@@ -51,7 +51,7 @@
 	loading={f.loading}
 	noun={(d?.group ?? ls.group) === 'image' ? 'images' : 'component versions'}
 	placeholder="name:openssl version:<3.0.13 license:gpl*"
-	showHidden={false}
+	markable={false}
 >
 	{#if d && d.items.length === 0}
 		<Empty title={ls.q ? 'No components match' : 'No SBOM reports'}>

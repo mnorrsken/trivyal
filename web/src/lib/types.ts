@@ -41,6 +41,8 @@ export interface List<T> {
 	rows: number;
 	items: T[];
 	facets?: Record<string, FacetValue[]>;
+	/** Matching findings the user hid. */
+	hidden?: number;
 }
 
 export interface SchemaField {
@@ -83,12 +85,14 @@ export interface ImageUse {
 export interface ImageGroup {
 	key: string;
 	ref: string;
+	name: string;
 	digest?: string;
 	os: OS;
 	counts: Counts;
 	fixable: number;
 	workloads: Workload[];
 	updated: string;
+	flagged?: boolean;
 }
 
 export interface WorkloadGroup {
@@ -96,6 +100,7 @@ export interface WorkloadGroup {
 	images: string[];
 	counts: Counts;
 	fixable: number;
+	flagged?: boolean;
 }
 
 export interface CVEGroup {
@@ -109,6 +114,7 @@ export interface CVEGroup {
 	images: number;
 	workloads: number;
 	fixable: boolean;
+	flagged?: boolean;
 }
 
 export interface Finding {
@@ -117,6 +123,7 @@ export interface Finding {
 	imageName: string;
 	vuln: Vulnerability;
 	workloads: Workload[];
+	flagged?: boolean;
 }
 
 export interface Check {
@@ -135,6 +142,7 @@ export interface ResourceGroup {
 	report: ReportRef;
 	counts: Counts;
 	passed: number;
+	flagged?: boolean;
 }
 
 export interface CheckGroup {
@@ -146,12 +154,14 @@ export interface CheckGroup {
 	remediation?: string;
 	failed: number;
 	passed: number;
+	flagged?: boolean;
 }
 
 export interface CheckFinding {
 	resource: Workload;
 	report: ReportRef;
 	check: Check;
+	flagged?: boolean;
 }
 
 export interface Secret {
@@ -171,6 +181,7 @@ export interface SecretFinding {
 	imageName: string;
 	report: ReportRef;
 	secret: Secret;
+	flagged?: boolean;
 }
 
 export interface SBOMInfo {
@@ -277,6 +288,7 @@ export interface Summary {
 	namespaces: NamespaceSummary[] | null;
 	staleWorkloads: number;
 	hidden: number;
+	flagged: number;
 }
 
 export interface SearchHit {
@@ -326,6 +338,7 @@ export interface WorkloadStat {
 
 export interface WorkloadRow extends WorkloadInfo {
 	stats: WorkloadStat;
+	flagged?: boolean;
 }
 
 export interface PodContainer {
@@ -376,6 +389,7 @@ export interface NamespaceRow {
 	vulns: Counts;
 	config: Counts;
 	secrets: number;
+	flagged?: boolean;
 }
 
 export interface WorkloadImage {
@@ -387,10 +401,11 @@ export interface WorkloadImage {
 	counts: Counts;
 	fixable: number;
 	hasSbom: boolean;
+	flagged?: boolean;
 }
 
-/** Something a user can hide; only the fields its kind needs are set. */
-export interface HideTarget {
+/** Something a user can flag or hide; only the fields its kind needs are set. */
+export interface MarkTarget {
 	kind: 'image' | 'image-cve' | 'cve' | 'secret' | 'check' | 'resource-check' | 'workload' | 'namespace';
 	image?: string;
 	id?: string;
@@ -401,14 +416,16 @@ export interface HideTarget {
 	namespace?: string;
 }
 
-/** A hidden target: findings were hidden, hiding of them are still there, new turned up since and show again. */
+export type MarkState = 'flagged' | 'hidden';
+
+/** A flagged or hidden target. */
 export interface MarkInfo {
 	id: number;
-	target: HideTarget;
+	target: MarkTarget;
+	state: MarkState;
 	note: string;
 	created: string;
 	updated: string;
-	findings: number;
-	hiding: number;
-	new: number;
+	/** Only with ?counts=1: findings when marked, now, and new since (a hide does not cover them). */
+	counts?: { findings: number; now: number; new: number };
 }

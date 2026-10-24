@@ -9,6 +9,7 @@
 	import Empty from '#lib/components/Empty.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
 	import SortTh from '#lib/components/SortTh.svelte';
@@ -57,6 +58,7 @@
 					<SortTh key="config" current={sort} {onsort}>Misconfigurations</SortTh>
 					<th class="r">Secrets</th>
 					<th>Images</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -77,6 +79,7 @@
 								<div><ImageName ref={c.image} link={false} /></div>
 							{/each}
 						</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'workload', resource: { kind: w.kind, namespace: w.namespace, name: w.name } }} contains={w.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>

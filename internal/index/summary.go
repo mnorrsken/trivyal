@@ -62,6 +62,7 @@ type NamespaceSummary struct {
 	Config    reports.SeveritySummary `json:"config"`
 	Secrets   int                     `json:"secrets"`
 	Workloads int                     `json:"workloads"`
+	Flagged   bool                    `json:"flagged,omitempty"`
 }
 
 // Summary computes the dashboard data. Stale workloads are left out.
@@ -106,6 +107,9 @@ func (s *Snapshot) Summary() *Summary {
 			if n := ns(w.Namespace); n != nil {
 				n.Workloads++
 			}
+		}
+		if n := ns(w.Namespace); n != nil && r.flagged {
+			n.Flagged = true
 		}
 		k := w.Namespace + "|" + findingKey(r.Image, r.V)
 		if !seenNS[k] {
@@ -154,6 +158,7 @@ func (s *Snapshot) Summary() *Summary {
 		if r.Type == CheckConfig {
 			if n := ns(r.Resource.Namespace); n != nil {
 				n.Config.Inc(r.C.Severity)
+				n.Flagged = n.Flagged || r.flagged
 			}
 		}
 	}
@@ -185,6 +190,7 @@ func (s *Snapshot) Summary() *Summary {
 			seenSecret[k] = true
 			if n := ns(r.Scan.Workload.Namespace); n != nil {
 				n.Secrets++
+				n.Flagged = n.Flagged || r.flagged
 			}
 		}
 	}

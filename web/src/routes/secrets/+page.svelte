@@ -7,7 +7,7 @@
 	import { int } from '#lib/format.ts';
 	import type { List, SecretFinding } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideButton from '#lib/components/HideButton.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import ListLayout from '#lib/components/ListLayout.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
@@ -51,6 +51,7 @@
 	error={f.error}
 	loading={f.loading}
 	noun="secrets"
+	hidden={d?.hidden}
 	placeholder="sev:high category:AWS ns:demo"
 >
 	{#if d && d.items.length === 0}
@@ -89,8 +90,8 @@
 								<button class="btn small" onclick={() => (shown[i] = true)}>Show</button>
 							{/if}
 						</td>
-						<td class="r">
-							<HideButton target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} small />
+						<td class="r mark-col">
+							<MarkMenu target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} contains={s.flagged} row />
 						</td>
 					</tr>
 				{/each}

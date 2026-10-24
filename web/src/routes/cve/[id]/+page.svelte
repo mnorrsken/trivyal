@@ -4,10 +4,10 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { date } from '#lib/format.ts';
-	import type { Finding, MarkInfo, Vulnerability } from '#lib/types.ts';
+	import type { Finding, Vulnerability } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideButton from '#lib/components/HideButton.svelte';
-	import HideControls from '#lib/components/HideControls.svelte';
+	import HiddenNote from '#lib/components/HiddenNote.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import WorkloadLink from '#lib/components/WorkloadLink.svelte';
@@ -16,17 +16,15 @@
 		id: string;
 		vuln: Vulnerability;
 		affected: Finding[];
-		hidden?: MarkInfo;
+		hiddenFindings: number;
 	}
 
 	const id = $derived(page.params.id ?? '');
-	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<CVEDetail>();
 	$effect(() => {
 		const i = id;
-		const p = { hidden };
 		live.generation;
-		f.run(() => api<CVEDetail>('cve/' + encodeURIComponent(i), p));
+		f.run(() => api<CVEDetail>('cve/' + encodeURIComponent(i)));
 	});
 	const d = $derived(f.data);
 	const v = $derived(d?.vuln);
@@ -44,7 +42,8 @@
 		<h1><span class="mono">{d.id}</span> <SevBadge severity={v.severity} /></h1>
 		{#if v.title}<p class="title">{v.title}</p>{/if}
 		<div class="ctl">
-			<HideControls target={{ kind: 'cve', id: d.id }} mark={d.hidden} noun="vulnerability" />
+			<MarkMenu target={{ kind: 'cve', id: d.id }} label="Flag or hide" />
+			<HiddenNote count={d.hiddenFindings} />
 		</div>
 	</header>
 
@@ -72,7 +71,7 @@
 	<section class="card affected">
 		<h2 class="section-title pad-h">Affected images</h2>
 		{#if d.affected.length === 0}
-			<Empty title="Hidden everywhere">Every image with this vulnerability is hidden. Check “Show hidden” to see them.</Empty>
+			<Empty title="Hidden everywhere">Every image with this vulnerability is hidden.</Empty>
 		{:else}
 		<table class="table">
 			<thead><tr><th>Image</th><th>Package</th><th>Installed</th><th>Fixed in</th><th>Workloads</th><th></th></tr></thead>
@@ -90,7 +89,7 @@
 								<div><WorkloadLink {w} /></div>
 							{/each}
 						</td>
-						<td class="r"><HideButton target={{ kind: 'image-cve', image: a.imageName, id: d.id }} label="Hide in image" small /></td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'image-cve', image: a.imageName, id: d.id }} contains={a.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>

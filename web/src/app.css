@@ -158,6 +158,12 @@ a.link:hover {
 .table .r {
 	text-align: right;
 }
+/* The flag/hide pill column stays in view when a wide table scrolls. */
+.table td.mark-col {
+	position: sticky;
+	right: 0;
+	background: var(--surface);
+}
 .mono {
 	font-family: var(--font-mono);
 	font-size: 12.5px;

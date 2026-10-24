@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import Search from '#lib/components/Search.svelte';
 	import { live } from '#lib/live.svelte.ts';
+	import { marks } from '#lib/marks.svelte.ts';
 	import { schemas } from '#lib/schema.svelte.ts';
 	import { api } from '#lib/api.ts';
 	import type { LayoutProps } from './$types';
@@ -23,7 +24,7 @@
 		{ href: '/checks/infra', label: 'Infrastructure' },
 		{ href: '/compliance', label: 'Compliance' },
 		{ href: '/sbom', label: 'SBOM' },
-		{ href: '/hidden', label: 'Hidden' }
+		{ href: '/marks', label: 'Flagged & hidden' }
 	];
 	const clusterNav = [
 		{ href: '/workloads', label: 'Workloads', also: ['/workload', '/pod'] },
@@ -70,6 +71,12 @@
 	$effect(() => {
 		page.url.pathname;
 		menu = false;
+	});
+
+	// The pills on every page read the marks from here.
+	$effect(() => {
+		live.generation;
+		marks.load();
 	});
 </script>
 

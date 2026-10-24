@@ -25,8 +25,8 @@ export class ListState {
 	get stale() {
 		return page.url.searchParams.get('stale') === '1';
 	}
-	get hidden() {
-		return page.url.searchParams.get('hidden') === '1';
+	get flagFirst() {
+		return page.url.searchParams.get('flagfirst') !== '0';
 	}
 
 	/** Parameters for the API call. */
@@ -38,7 +38,7 @@ export class ListState {
 			page: this.page,
 			size: this.size,
 			stale: this.stale ? '1' : undefined,
-			hidden: this.hidden ? '1' : undefined
+			flagfirst: this.flagFirst ? undefined : '0'
 		};
 	}
 

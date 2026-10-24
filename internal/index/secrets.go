@@ -25,6 +25,8 @@ type SecretRow struct {
 	Scan *SecretScan
 	S    *reports.Secret
 	text string
+	// flagged is set on copies made by Apply.
+	flagged bool
 }
 
 // SecretSchema lists the filters for exposed secrets.
@@ -129,7 +131,10 @@ type SecretFinding struct {
 	ImageName string          `json:"imageName"`
 	Report    ReportRef       `json:"report"`
 	Secret    *reports.Secret `json:"secret"`
+	Flagged   bool            `json:"flagged,omitempty"`
 }
+
+func (f *SecretFinding) IsFlagged() bool { return f.Flagged }
 
 // SecretFindings flattens secret rows.
 func SecretFindings(rows []*SecretRow) []*SecretFinding {
@@ -137,7 +142,7 @@ func SecretFindings(rows []*SecretRow) []*SecretFinding {
 	for i, r := range rows {
 		out[i] = &SecretFinding{
 			Workload: r.Scan.Workload, Container: r.Scan.Container, Image: r.Scan.Image,
-			ImageKey: r.Scan.ImageKey, ImageName: r.Scan.ImageName, Report: r.Scan.Report, Secret: r.S,
+			ImageKey: r.Scan.ImageKey, ImageName: r.Scan.ImageName, Report: r.Scan.Report, Secret: r.S, Flagged: r.flagged,
 		}
 	}
 	return out

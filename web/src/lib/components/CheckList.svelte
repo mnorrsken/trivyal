@@ -1,10 +1,10 @@
 <script lang="ts">
-	// Failed checks with expandable description and fix; an opened row can
-	// hide the check on its resource.
+	// Failed checks with expandable description and fix; rows can flag or
+	// hide the check on their resource.
 	import { checkTypes } from '../checks';
 	import type { CheckFinding } from '../types';
 	import Empty from './Empty.svelte';
-	import HideButton from './HideButton.svelte';
+	import MarkMenu from './MarkMenu.svelte';
 	import SevBadge from './SevBadge.svelte';
 	import WorkloadLink from './WorkloadLink.svelte';
 
@@ -28,6 +28,7 @@
 				<th>Check</th>
 				{#if showResource}<th>Resource</th>{/if}
 				<th>Message</th>
+				{#if typeKnown}<th></th>{/if}
 			</tr>
 		</thead>
 		<tbody>
@@ -44,21 +45,17 @@
 					</td>
 					{#if showResource}<td class="res"><WorkloadLink w={f.resource} /></td>{/if}
 					<td class="small ink2">{f.check.messages?.join(' ') ?? ''}</td>
+					{#if typeKnown}
+						<td class="r mark-col">
+							<MarkMenu target={{ kind: 'resource-check', type, id: f.check.checkID, resource: f.resource }} contains={f.flagged} row />
+						</td>
+					{/if}
 				</tr>
 				{#if open === i}
 					<tr class="detail">
-						<td colspan={showResource ? 4 : 3}>
+						<td colspan={(showResource ? 4 : 3) + (typeKnown ? 1 : 0)}>
 							{#if f.check.description}<p class="prose-sm">{f.check.description}</p>{/if}
 							{#if f.check.remediation}<p class="prose-sm fix"><strong>Fix:</strong> {f.check.remediation}</p>{/if}
-							{#if typeKnown}
-								<div class="hide">
-									<HideButton
-										target={{ kind: 'resource-check', type, id: f.check.checkID, resource: f.resource }}
-										label="Hide on this resource"
-										small
-									/>
-								</div>
-							{/if}
 						</td>
 					</tr>
 				{/if}
@@ -86,7 +83,5 @@
 	.fix {
 		margin-top: 6px;
 	}
-	.hide {
-		margin-top: 10px;
-	}
+
 </style>

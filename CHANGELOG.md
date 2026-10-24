@@ -5,6 +5,39 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Added
+
+- Flag items as well as hide them. A mark now has a state, `flagged` or
+  `hidden`, on the same targets as before; one state per target. A flag
+  covers everything in its target, now and later. A hide still covers only
+  the findings present when hidden. If both cover a finding, the hide wins.
+- Flagged items sort first by default in vulnerability groupings, checks,
+  secrets, workloads, namespaces and most tables on detail pages. A "Flagged
+  first" checkbox in the list sidebar turns it off (`flagfirst=0`). A group
+  counts as flagged when it, or a finding in it, is flagged, and shows a
+  flag marker.
+- One pill per item (Mark, Flagged, Hidden) opens a menu with note, Flag,
+  Hide ("Hide again" also hides new findings) and Clear. In wide tables the
+  pill column sticks to the right edge.
+- Dashboard line "N flagged, M hidden" linking to `/marks`.
+- `?counts=1` on `GET /api/v1/marks` adds per-mark counts: findings when
+  marked, now, and new.
+- Database migration adds `marks.state` (default `hidden`), so marks saved by
+  0.2.x stay hidden.
+
+### Changed
+
+- The Hidden page is now "Flagged & hidden" at `/marks`, with state, kind,
+  target, note, finding counts and date.
+- "Show hidden" and `hidden=1` are gone. Lists say "N hidden findings not
+  shown"; detail pages add a Manage link to `/marks`.
+- API: `/api/v1/hidden` is now `/api/v1/marks`. `POST` takes
+  `{"target": {...}, "state": "flagged"|"hidden", "note": "..."}` (JSON
+  content type required; an omitted note keeps the old one). A flag may go on
+  a target with no findings, a hide may not. List responses have `hidden`,
+  detail responses `hiddenFindings`, items `flagged`; the summary has
+  `hidden` and `flagged` counts.
+
 ## [0.2.1] - 2026-10-23
 
 0.2.0 was tagged but not published: its release failed in tests. This

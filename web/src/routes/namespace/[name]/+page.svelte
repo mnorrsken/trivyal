@@ -4,10 +4,11 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { ago, qs, total } from '#lib/format.ts';
-	import type { CheckFinding, MarkInfo, NamespaceRow, WorkloadRow } from '#lib/types.ts';
+	import type { CheckFinding, NamespaceRow, WorkloadRow } from '#lib/types.ts';
 	import CheckList from '#lib/components/CheckList.svelte';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideControls from '#lib/components/HideControls.svelte';
+	import HiddenNote from '#lib/components/HiddenNote.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
 	import WorkloadLink from '#lib/components/WorkloadLink.svelte';
@@ -16,17 +17,15 @@
 		workloadList: WorkloadRow[];
 		configFindings: CheckFinding[];
 		rbacFindings: CheckFinding[];
-		hidden?: MarkInfo;
+		hiddenFindings: number;
 	};
 
 	const name = $derived(page.params.name ?? '');
-	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<Detail>();
 	$effect(() => {
 		const n = name;
-		const p = { hidden };
 		live.generation;
-		f.run(() => api<Detail>('namespace/' + encodeURIComponent(n), p));
+		f.run(() => api<Detail>('namespace/' + encodeURIComponent(n)));
 	});
 	const d = $derived(f.data);
 	const max = $derived(Math.max(1, ...(d?.workloadList ?? []).map((w) => total(w.stats.vulns))));
@@ -55,7 +54,8 @@
 			<a class="btn" href="/checks/rbac{nsq}">RBAC</a>
 		</nav>
 		<div class="ctl">
-			<HideControls target={{ kind: 'namespace', namespace: d.name }} mark={d.hidden} noun="namespace" />
+			<MarkMenu target={{ kind: 'namespace', namespace: d.name }} label="Flag or hide" />
+			<HiddenNote count={d.hiddenFindings} />
 		</div>
 	</header>
 
@@ -72,7 +72,7 @@
 			<Empty title="No workloads" />
 		{:else}
 			<table class="table">
-				<thead><tr><th>Workload</th><th class="r">Ready</th><th>Vulnerabilities</th><th>Misconfigurations</th><th class="r">Secrets</th></tr></thead>
+				<thead><tr><th>Workload</th><th class="r">Ready</th><th>Vulnerabilities</th><th>Misconfigurations</th><th class="r">Secrets</th><th></th></tr></thead>
 				<tbody>
 					{#each d.workloadList as w (w.kind + w.name)}
 						<tr>
@@ -83,6 +83,9 @@
 							<td class="sev"><SevCounts counts={w.stats.vulns} /><SevBar counts={w.stats.vulns} {max} height={5} /></td>
 							<td><SevCounts counts={w.stats.config} showUnknown={false} /></td>
 							<td class="r num">{w.stats.secrets || ''}</td>
+							<td class="r mark-col">
+								<MarkMenu target={{ kind: 'workload', resource: { kind: w.kind, namespace: w.namespace, name: w.name } }} contains={w.flagged} row />
+							</td>
 						</tr>
 					{/each}
 				</tbody>

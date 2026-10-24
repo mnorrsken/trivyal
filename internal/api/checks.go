@@ -30,12 +30,16 @@ func (s *Server) checks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	snap, _, ok := s.visible(w, r)
+	snap, uv, ok := s.visible(w, r)
 	if !ok {
 		return
 	}
 	rows, all, m := snap.MatchChecks(typ, p.q, p.stale)
 	res := List{Page: p.page, Size: p.size, Group: p.group, Rows: len(rows), Facets: m.Facets(all, index.CheckFacets, 50)}
+	if uv.hidden {
+		every, _, _ := uv.base.MatchChecks(typ, p.q, p.stale)
+		res.Hidden = hiddenRows(uv, every, rows, index.Findings)
+	}
 	switch p.group {
 	case "check":
 		g := index.GroupByCheck(rows)
@@ -58,7 +62,8 @@ func (s *Server) checks(w http.ResponseWriter, r *http.Request) {
 type CheckDetail struct {
 	Check     *reports.Check        `json:"check"`
 	Resources []*index.CheckFinding `json:"resources"`
-	Hidden    *MarkInfo             `json:"hidden,omitempty"`
+	// HiddenFindings counts the failures of the check the user hid.
+	HiddenFindings int `json:"hiddenFindings"`
 }
 
 func (s *Server) check(w http.ResponseWriter, r *http.Request) {
@@ -88,13 +93,14 @@ func (s *Server) check(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, row := range snap.Checks {
 		if want(row) {
-			d.Resources = append(d.Resources, &index.CheckFinding{Resource: row.Resource, Report: row.Report, Check: row.C})
+			d.Resources = append(d.Resources, row.AsFinding())
 		}
 	}
-	d.Hidden = uv.mark(index.Target{Kind: index.HideCheck, Type: typ, ID: d.Check.ID})
+	d.HiddenFindings = uv.hiddenIn(index.Target{Kind: index.TargetCheck, Type: typ, ID: d.Check.ID})
 	slices.SortStableFunc(d.Resources, func(a, b *index.CheckFinding) int {
 		return cmp.Or(cmp.Compare(boolInt(a.Check.Success), boolInt(b.Check.Success)), cmp.Compare(a.Resource.String(), b.Resource.String()))
 	})
+	slices.SortStableFunc(d.Resources, index.FlaggedFirst)
 	writeJSON(w, d)
 }
 

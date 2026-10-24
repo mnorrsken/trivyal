@@ -20,13 +20,17 @@ func (s *Server) secrets(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	snap, _, ok := s.visible(w, r)
+	snap, uv, ok := s.visible(w, r)
 	if !ok {
 		return
 	}
 	rows, all, m := snap.MatchSecrets(p.q, p.stale)
 	f := index.SecretFindings(index.UniqueSecrets(rows))
 	res := SecretList{List: List{Page: p.page, Size: p.size, Group: "finding", Rows: len(rows), Total: len(f), Facets: m.Facets(all, index.SecretFacets, 50)}}
+	if uv.hidden {
+		every, _, _ := uv.base.MatchSecrets(p.q, p.stale)
+		res.Hidden = hiddenRows(uv, every, rows, index.UniqueSecrets)
+	}
 	res.Items, res.Sort = page(f, p.sort, "severity", index.SecretSorts, p)
 	for _, sc := range snap.SecretScans {
 		if sc.Workload.Stale && !p.stale {

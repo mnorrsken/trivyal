@@ -87,7 +87,7 @@ func (s *Server) complianceControl(w http.ResponseWriter, r *http.Request) {
 			d.Checks[id] = &CheckInfo{Title: row.C.Title, Severity: row.C.Severity, Type: row.Type}
 		}
 		if !row.C.Success {
-			d.Failing = append(d.Failing, &ControlFinding{Type: row.Type, CheckFinding: &index.CheckFinding{Resource: row.Resource, Report: row.Report, Check: row.C}})
+			d.Failing = append(d.Failing, &ControlFinding{Type: row.Type, CheckFinding: row.AsFinding()})
 		}
 	}
 	slices.SortStableFunc(d.Failing, func(a, b *ControlFinding) int {

@@ -5,10 +5,10 @@
 	import { Fetcher } from '#lib/fetcher.svelte.ts';
 	import { live } from '#lib/live.svelte.ts';
 	import { ago, int, qs, reportHref } from '#lib/format.ts';
-	import type { Counts, ImageUse, MarkInfo, SBOMInfo, SecretFinding, Vulnerability, OS } from '#lib/types.ts';
+	import type { Counts, ImageUse, SBOMInfo, SecretFinding, Vulnerability, OS } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
-	import HideButton from '#lib/components/HideButton.svelte';
-	import HideControls from '#lib/components/HideControls.svelte';
+	import HiddenNote from '#lib/components/HiddenNote.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import ImageName from '#lib/components/ImageName.svelte';
 	import SevBadge from '#lib/components/SevBadge.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
@@ -34,17 +34,16 @@
 		secrets: SecretFinding[] | null;
 		secretScanned: boolean;
 		sbom?: SBOMInfo;
-		hidden?: MarkInfo;
+		hiddenFindings: number;
 	}
 
 	const key = $derived(page.url.searchParams.get('key') ?? '');
 	const tab = $derived(page.url.searchParams.get('tab') ?? 'vulns');
-	const hidden = $derived(page.url.searchParams.get('hidden') ?? undefined);
 	const f = new Fetcher<ImageDetail>();
 	$effect(() => {
-		const p = { key, hidden };
+		const k = key;
 		live.generation;
-		f.run(() => api<ImageDetail>('image', p));
+		f.run(() => api<ImageDetail>('image', { key: k }));
 	});
 	const d = $derived(f.data);
 	const live_uses = $derived((d?.uses ?? []).filter((u) => !u.workload.stale));
@@ -76,10 +75,9 @@
 			{/if}
 			<span class="pill">{live_uses.length} workload{live_uses.length === 1 ? '' : 's'}</span>
 			<span class="pill">scanned {ago(d.updated)}</span>
+			{#if d.name}<MarkMenu target={{ kind: 'image', image: d.name }} label="Flag or hide" />{/if}
 		</div>
-		<div class="ctl">
-			<HideControls target={d.name ? { kind: 'image', image: d.name } : undefined} mark={d.hidden} noun="image" />
-		</div>
+		<HiddenNote count={d.hiddenFindings} />
 	</header>
 
 	<div class="tiles">
@@ -146,8 +144,12 @@
 								<td>{s.secret.title}<div class="muted small mono">{s.secret.ruleID}</div></td>
 								<td class="mono small">{s.secret.target}</td>
 								<td class="mono small muted trunc match">{s.secret.match}</td>
-								<td class="r">
-									<HideButton target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }} small />
+								<td class="r mark-col">
+									<MarkMenu
+										target={{ kind: 'secret', image: s.imageName, rule: s.secret.ruleID, file: s.secret.target }}
+										contains={s.flagged}
+										row
+									/>
 								</td>
 							</tr>
 						{/each}
@@ -191,9 +193,6 @@
 	}
 	.eol {
 		color: var(--sev-critical);
-	}
-	.ctl {
-		margin-top: 12px;
 	}
 	.tiles {
 		display: grid;

@@ -18,12 +18,16 @@ func (s *Server) vulnerabilities(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	snap, _, ok := s.visible(w, r)
+	snap, uv, ok := s.visible(w, r)
 	if !ok {
 		return
 	}
 	rows, all, m := snap.MatchVulns(p.q, p.stale)
 	res := List{Page: p.page, Size: p.size, Group: p.group, Rows: len(rows), Facets: m.Facets(all, index.VulnFacets, 50)}
+	if uv.hidden {
+		every, _, _ := uv.base.MatchVulns(p.q, p.stale)
+		res.Hidden = hiddenRows(uv, every, rows, index.GroupByFinding)
+	}
 	switch p.group {
 	case "workload":
 		g := index.GroupByWorkload(rows)
@@ -53,7 +57,9 @@ type ImageDetail struct {
 	Secrets         []*index.SecretFinding  `json:"secrets"`
 	SecretScanned   bool                    `json:"secretScanned"`
 	SBOM            *index.SBOMInfo         `json:"sbom,omitempty"`
-	Hidden          *MarkInfo               `json:"hidden,omitempty"`
+	// HiddenFindings counts the findings of the image's name (all tags)
+	// the user hid.
+	HiddenFindings int `json:"hiddenFindings"`
 }
 
 func (s *Server) image(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +76,7 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 	}
 	d := ImageDetail{Image: img, SBOM: sb}
 	if img != nil {
-		d.Hidden = uv.mark(index.Target{Kind: index.HideImage, Image: img.Name})
+		d.HiddenFindings = uv.hiddenIn(index.Target{Kind: index.TargetImage, Image: img.Name})
 		// Not nil when all are hidden: the UI tells "none" from "no report".
 		d.Vulnerabilities = append([]reports.Vulnerability{}, img.Vulns()...)
 		slices.SortStableFunc(d.Vulnerabilities, func(a, b reports.Vulnerability) int {
@@ -112,7 +118,8 @@ type CVEDetail struct {
 	ID       string                 `json:"id"`
 	Vuln     *reports.Vulnerability `json:"vuln"`
 	Affected []*index.Finding       `json:"affected"`
-	Hidden   *MarkInfo              `json:"hidden,omitempty"`
+	// HiddenFindings counts the findings of the CVE the user hid.
+	HiddenFindings int `json:"hiddenFindings"`
 }
 
 func (s *Server) cve(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +153,8 @@ func (s *Server) cve(w http.ResponseWriter, r *http.Request) {
 	if f == nil {
 		f = []*index.Finding{}
 	}
-	writeJSON(w, CVEDetail{ID: id, Vuln: best, Affected: f, Hidden: uv.mark(index.Target{Kind: index.HideCVE, ID: id})})
+	slices.SortStableFunc(f, index.FlaggedFirst)
+	writeJSON(w, CVEDetail{ID: id, Vuln: best, Affected: f, HiddenFindings: uv.hiddenIn(index.Target{Kind: index.TargetCVE, ID: id})})
 }
 
 // vulnerabilitiesCSV exports every matching finding (one row per image and

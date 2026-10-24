@@ -41,6 +41,8 @@ type CheckRow struct {
 	Dup     bool
 	updated time.Time
 	text    string
+	// flagged is set on copies made by Apply.
+	flagged bool
 }
 
 // CheckSchema lists the filters for config audit, RBAC and infra checks.
@@ -159,6 +161,7 @@ type ResourceGroup struct {
 	Report   ReportRef               `json:"report"`
 	Counts   reports.SeveritySummary `json:"counts"`
 	Passed   int                     `json:"passed"`
+	Flagged  bool                    `json:"flagged,omitempty"`
 }
 
 // GroupByResource counts failed checks per resource.
@@ -173,6 +176,7 @@ func GroupByResource(rows []*CheckRow) []*ResourceGroup {
 			groups[k] = g
 			order = append(order, g)
 		}
+		g.Flagged = g.Flagged || r.flagged
 		if r.C.Success {
 			g.Passed++
 		} else {
@@ -192,6 +196,7 @@ type CheckGroup struct {
 	Remediation string `json:"remediation,omitempty"`
 	Failed      int    `json:"failed"`
 	Passed      int    `json:"passed"`
+	Flagged     bool   `json:"flagged,omitempty"`
 }
 
 // GroupByCheck counts resources per check.
@@ -206,6 +211,7 @@ func GroupByCheck(rows []*CheckRow) []*CheckGroup {
 			groups[c.ID] = g
 			order = append(order, g)
 		}
+		g.Flagged = g.Flagged || r.flagged
 		if r.C.Success {
 			g.Passed++
 		} else {
@@ -220,6 +226,16 @@ type CheckFinding struct {
 	Resource Workload       `json:"resource"`
 	Report   ReportRef      `json:"report"`
 	Check    *reports.Check `json:"check"`
+	Flagged  bool           `json:"flagged,omitempty"`
+}
+
+func (g *ResourceGroup) IsFlagged() bool { return g.Flagged }
+func (g *CheckGroup) IsFlagged() bool    { return g.Flagged }
+func (f *CheckFinding) IsFlagged() bool  { return f.Flagged }
+
+// AsFinding returns the row as a CheckFinding.
+func (r *CheckRow) AsFinding() *CheckFinding {
+	return &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C, Flagged: r.flagged}
 }
 
 // Findings flattens check rows, one per check and resource.
@@ -227,7 +243,7 @@ func Findings(rows []*CheckRow) []*CheckFinding {
 	rows = uniqueChecks(rows)
 	out := make([]*CheckFinding, len(rows))
 	for i, r := range rows {
-		out[i] = &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C}
+		out[i] = r.AsFinding()
 	}
 	return out
 }

@@ -14,6 +14,8 @@ type WorkloadStat struct {
 	Config  reports.SeveritySummary `json:"config"`
 	Secrets int                     `json:"secrets"`
 	Images  int                     `json:"images"`
+	// Flagged is set when a flag covers some of the findings.
+	Flagged bool `json:"flagged,omitempty"`
 }
 
 // WorkloadStats returns stats per workload (key: Resource.String()),
@@ -36,6 +38,7 @@ func (s *Snapshot) WorkloadStats() map[string]*WorkloadStat {
 			continue
 		}
 		st := get(w.Resource)
+		st.Flagged = st.Flagged || r.flagged
 		ik := w.String() + "|" + r.Image.Key
 		if !seen[ik] {
 			seen[ik] = true
@@ -55,11 +58,15 @@ func (s *Snapshot) WorkloadStats() map[string]*WorkloadStat {
 		if r.Type != CheckConfig || r.Resource.Stale || r.C.Success {
 			continue
 		}
-		get(r.Resource.Resource).Config.Inc(r.C.Severity)
+		st := get(r.Resource.Resource)
+		st.Config.Inc(r.C.Severity)
+		st.Flagged = st.Flagged || r.flagged
 	}
 	for _, r := range UniqueSecrets(s.Secrets) {
 		if !r.Scan.Workload.Stale {
-			get(r.Scan.Workload.Resource).Secrets++
+			st := get(r.Scan.Workload.Resource)
+			st.Secrets++
+			st.Flagged = st.Flagged || r.flagged
 		}
 	}
 	return out
@@ -75,6 +82,7 @@ type WorkloadImage struct {
 	Counts    reports.SeveritySummary `json:"counts"`
 	Fixable   int                     `json:"fixable"`
 	HasSBOM   bool                    `json:"hasSbom"`
+	Flagged   bool                    `json:"flagged,omitempty"`
 }
 
 // WorkloadReports is everything trivy found for one workload.
@@ -119,11 +127,14 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 		}
 	}
 	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int { return cmp.Compare(a.Container, b.Container) })
-	if s.hidden {
-		// What is hidden can differ per workload: count this workload's rows.
+	if s.hidden || s.flags {
+		// What is hidden or flagged can differ per workload: go through this
+		// workload's rows, and count them when some are hidden.
 		byKey := map[string]*WorkloadImage{}
 		for _, wi := range out.Images {
-			wi.Counts, wi.Fixable = reports.SeveritySummary{}, 0
+			if s.hidden {
+				wi.Counts, wi.Fixable = reports.SeveritySummary{}, 0
+			}
 			byKey[wi.Container+"|"+wi.Key] = wi
 		}
 		seen := map[string]bool{}
@@ -133,8 +144,12 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 			}
 			k := r.Use.Container + "|" + r.Image.Key
 			wi := byKey[k]
+			if wi == nil {
+				continue
+			}
+			wi.Flagged = wi.Flagged || r.flagged
 			fk := k + "|" + findingKey(r.Image, r.V)
-			if wi == nil || seen[fk] {
+			if !s.hidden || seen[fk] {
 				continue
 			}
 			seen[fk] = true
@@ -148,11 +163,12 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 		if r.Type == CheckConfig && sameWorkload(r.Resource, res) {
 			addRef(r.Report)
 			if !r.C.Success && !r.Dup {
-				out.Config = append(out.Config, &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C})
+				out.Config = append(out.Config, r.AsFinding())
 			}
 		}
 	}
 	slices.SortStableFunc(out.Config, CheckFindingSorts["severity"])
+	slices.SortStableFunc(out.Config, FlaggedFirst)
 	for _, sc := range s.SecretScans {
 		if sameWorkload(sc.Workload, res) {
 			addRef(sc.Report)
@@ -189,10 +205,11 @@ func (s *Snapshot) ChecksFor(typ string, keep func(Workload) bool) []*CheckFindi
 	out := []*CheckFinding{}
 	for _, r := range uniqueChecks(s.Checks) {
 		if r.Type == typ && !r.C.Success && !r.Resource.Stale && keep(r.Resource) {
-			out = append(out, &CheckFinding{Resource: r.Resource, Report: r.Report, Check: r.C})
+			out = append(out, r.AsFinding())
 		}
 	}
 	slices.SortStableFunc(out, CheckFindingSorts["severity"])
+	slices.SortStableFunc(out, FlaggedFirst)
 	return out
 }
 

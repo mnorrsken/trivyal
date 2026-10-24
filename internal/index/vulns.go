@@ -45,6 +45,8 @@ type VulnRow struct {
 	Use   ImageUse
 	V     *reports.Vulnerability
 	text  string
+	// flagged is set on copies made by Apply.
+	flagged bool
 }
 
 // VulnSchema lists the filters for vulnerabilities.
@@ -183,12 +185,15 @@ func findingKey(img *Image, v *reports.Vulnerability) string {
 type ImageGroup struct {
 	Key       string                  `json:"key"`
 	Ref       string                  `json:"ref"`
+	Name      string                  `json:"name"`
 	Digest    string                  `json:"digest,omitempty"`
 	OS        reports.OS              `json:"os"`
 	Counts    reports.SeveritySummary `json:"counts"`
 	Fixable   int                     `json:"fixable"`
 	Workloads []Workload              `json:"workloads"`
 	Updated   time.Time               `json:"updated"`
+	// Flagged is set when a flag covers some of the findings.
+	Flagged bool `json:"flagged,omitempty"`
 }
 
 // GroupByImage dedupes findings per image.
@@ -200,10 +205,11 @@ func GroupByImage(rows []*VulnRow) []*ImageGroup {
 	for _, r := range rows {
 		g := groups[r.Image.Key]
 		if g == nil {
-			g = &ImageGroup{Key: r.Image.Key, Ref: r.Image.Ref, Digest: r.Image.Digest, OS: r.Image.OS, Updated: r.Image.Updated}
+			g = &ImageGroup{Key: r.Image.Key, Ref: r.Image.Ref, Name: r.Image.Name, Digest: r.Image.Digest, OS: r.Image.OS, Updated: r.Image.Updated}
 			groups[r.Image.Key] = g
 			order = append(order, g)
 		}
+		g.Flagged = g.Flagged || r.flagged
 		wk := r.Image.Key + "|" + r.Use.Workload.String()
 		if !seenW[wk] {
 			seenW[wk] = true
@@ -228,6 +234,7 @@ type WorkloadGroup struct {
 	Images   []string                `json:"images"`
 	Counts   reports.SeveritySummary `json:"counts"`
 	Fixable  int                     `json:"fixable"`
+	Flagged  bool                    `json:"flagged,omitempty"`
 }
 
 // GroupByWorkload counts findings per workload, deduped across its pods'
@@ -245,6 +252,7 @@ func GroupByWorkload(rows []*VulnRow) []*WorkloadGroup {
 			groups[k] = g
 			order = append(order, g)
 		}
+		g.Flagged = g.Flagged || r.flagged
 		ik := k + "|" + r.Image.Key
 		if !seenImg[ik] {
 			seenImg[ik] = true
@@ -275,6 +283,7 @@ type CVEGroup struct {
 	Images    int      `json:"images"`
 	Workloads int      `json:"workloads"`
 	Fixable   bool     `json:"fixable"`
+	Flagged   bool     `json:"flagged,omitempty"`
 }
 
 // GroupByCVE lists each vulnerability ID once with its reach.
@@ -292,6 +301,7 @@ func GroupByCVE(rows []*VulnRow) []*CVEGroup {
 			groups[v.ID] = g
 			order = append(order, g)
 		}
+		g.Flagged = g.Flagged || r.flagged
 		if v.FixedVersion != "" {
 			g.Fixable = true
 		}
@@ -318,6 +328,7 @@ type Finding struct {
 	ImageName string                 `json:"imageName"`
 	Vuln      *reports.Vulnerability `json:"vuln"`
 	Workloads []Workload             `json:"workloads"`
+	Flagged   bool                   `json:"flagged,omitempty"`
 }
 
 // GroupByFinding dedupes rows to one per image and vulnerability.
@@ -333,12 +344,32 @@ func GroupByFinding(rows []*VulnRow) []*Finding {
 			groups[k] = f
 			order = append(order, f)
 		}
+		f.Flagged = f.Flagged || r.flagged
 		if wk := k + "|" + r.Use.Workload.String(); !seenW[wk] {
 			seenW[wk] = true
 			f.Workloads = append(f.Workloads, r.Use.Workload)
 		}
 	}
 	return order
+}
+
+// IsFlagged reports whether a flag covers the item, for sorting flagged
+// items first.
+func (g *ImageGroup) IsFlagged() bool    { return g.Flagged }
+func (g *WorkloadGroup) IsFlagged() bool { return g.Flagged }
+func (g *CVEGroup) IsFlagged() bool      { return g.Flagged }
+func (f *Finding) IsFlagged() bool       { return f.Flagged }
+
+// FlaggedFirst orders flagged items before the others.
+func FlaggedFirst[T interface{ IsFlagged() bool }](a, b T) int {
+	return cmp.Compare(boolRank(b.IsFlagged()), boolRank(a.IsFlagged()))
+}
+
+func boolRank(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // severityCmp orders severity summaries, worst first.

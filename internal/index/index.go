@@ -89,8 +89,10 @@ type Snapshot struct {
 	Oldest       time.Time
 	Newest       time.Time
 
-	// hidden is set on copies made by Hide.
+	// hidden and flags are set on copies made by Apply when marks hide or
+	// flag findings.
 	hidden bool
+	flags  bool
 }
 
 type resolver struct {

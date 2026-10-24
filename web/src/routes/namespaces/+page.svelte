@@ -5,6 +5,7 @@
 	import { total } from '#lib/format.ts';
 	import type { NamespaceRow } from '#lib/types.ts';
 	import Empty from '#lib/components/Empty.svelte';
+	import MarkMenu from '#lib/components/MarkMenu.svelte';
 	import SevBar from '#lib/components/SevBar.svelte';
 	import SevCounts from '#lib/components/SevCounts.svelte';
 
@@ -42,6 +43,7 @@
 					<th>Misconfigurations</th>
 					<th class="r">Secrets</th>
 					<th>Pod security</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -58,6 +60,7 @@
 						<td class="small">
 							{#if pss(n)}<span class="pill accent">{pss(n)}</span>{:else}<span class="muted">not enforced</span>{/if}
 						</td>
+						<td class="r mark-col"><MarkMenu target={{ kind: 'namespace', namespace: n.name }} contains={n.flagged} row /></td>
 					</tr>
 				{/each}
 			</tbody>
