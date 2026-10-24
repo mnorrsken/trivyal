@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Added
+
+- Trivy scans in CI, before the release image is pushed, and daily on the
+  published image (results under Security > Code scanning). Any
+  vulnerability with a fix fails the build. `make scan` runs the same checks
+  locally.
+
+### Security
+
+- golang.org/x/net 0.60.0 and golang.org/x/text 0.42.0 (2 high, 4 medium
+  CVEs).
+
 ## [0.3.0] - 2026-10-24
 
 ### Added

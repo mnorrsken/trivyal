@@ -140,6 +140,7 @@ make build     # web + Go into bin/trivyal
 make dev       # backend on :8080 (db in bin/trivyal.db) + Vite on :5173
 make test      # Go tests, svelte-check and vitest
 make lint      # golangci-lint
+make scan      # Trivy on the source tree and a fresh image, as CI does
 make lab       # kind cluster with trivy-operator and this build
 make lab-down
 ```

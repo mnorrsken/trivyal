@@ -80,6 +80,29 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest
 
+      # Same gate as CI, right before publishing: nothing with a fixable
+      # vulnerability ships. The amd64 build is scanned; the push below
+      # reuses its layers.
+      - name: Build image for scanning
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: trivyal:scan
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: trivyal:scan
+          scanners: vuln
+          ignore-unfixed: true
+          exit-code: '1'
+          version: v0.76.1
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:

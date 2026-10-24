@@ -3,6 +3,8 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 LDFLAGS := -s -w -X $(PKG)/internal/version.Version=$(VERSION) -X $(PKG)/internal/version.Commit=$(COMMIT)
 IMAGE   ?= ghcr.io/mnorrsken/trivyal
+# Same Trivy version as the workflows.
+TRIVY   ?= aquasec/trivy:0.76.1
 WEB_OUT := internal/web/dist/app
 
 # Words that must never appear in the repo (real cluster names), checked in
@@ -10,7 +12,7 @@ WEB_OUT := internal/web/dist/app
 # outside the repo on purpose; the check is skipped when the file is missing.
 LEAK_DENYLIST ?= $(HOME)/.config/trivyal/leak-denylist
 
-.PHONY: all build build-go run dev web web-deps test go-test web-test race vet fmt lint leakcheck helm-lint clean docker-build lab lab-down
+.PHONY: all build build-go run dev web web-deps test go-test web-test race vet fmt lint leakcheck helm-lint clean docker-build scan lab lab-down
 
 all: build
 
@@ -75,6 +77,15 @@ clean:
 
 docker-build:
 	docker build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t $(IMAGE):$(VERSION) .
+
+# Trivy, as in CI: the source tree (dependencies, secrets) and a fresh
+# image. Fails on any vulnerability that has a fix.
+scan:
+	docker build -q -t trivyal:scan . >/dev/null
+	docker run --rm -v $(HOME)/.cache/trivy:/root/.cache/trivy -v $(CURDIR):/src:ro $(TRIVY) fs --quiet \
+		--scanners vuln,secret --ignore-unfixed --exit-code 1 --skip-dirs web/node_modules,bin,internal/web/dist /src
+	docker run --rm -v $(HOME)/.cache/trivy:/root/.cache/trivy -v /var/run/docker.sock:/var/run/docker.sock $(TRIVY) image --quiet \
+		--scanners vuln --ignore-unfixed --exit-code 1 trivyal:scan
 
 # Throwaway kind cluster with trivy-operator and this build (dev/lab.sh).
 lab:
