@@ -93,7 +93,7 @@ func (s *Snapshot) addSecrets(kind string, r *reports.ExposedSecretReport, w Wor
 		Workload: w, Container: r.Container,
 		Image: ImageRef(r.Registry, r.Artifact), ImageKey: imageKey(r.Registry, r.Artifact),
 		ImageName: ImageRef(r.Registry, reports.Artifact{Repository: r.Artifact.Repository}),
-		Report: ReportRef{kind, r.Namespace, r.Name}, Summary: r.Summary, Updated: r.Updated,
+		Report:    ReportRef{kind, r.Namespace, r.Name}, Summary: r.Summary, Updated: r.Updated,
 	}
 	s.SecretScans = append(s.SecretScans, scan)
 	for i := range r.Secrets {
