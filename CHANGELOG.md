@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
 ### Added
 
 - Flag items as well as hide them. A mark now has a state, `flagged` or
