@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-24
+
 ### Added
 
 - Trivy scans in CI, before the release image is pushed, and daily on the
@@ -16,6 +18,10 @@ All notable changes to this project are documented here. Headings use
 
 - golang.org/x/net 0.60.0 and golang.org/x/text 0.42.0 (2 high, 4 medium
   CVEs).
+- github.com/go-jose/go-jose/v4 4.1.6, used to check OIDC tokens: fixes
+  crashes and a denial of service in JWK, JSON and JWE parsing. JWK RSA keys
+  are now limited to 4096 bits.
+- Dependabot version updates and security alerts.
 
 ## [0.3.0] - 2026-10-24
 
