@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-25
+
+### Fixed
+
+- The config audit report page showed "500 Internal Error" when a check
+  appeared once per container.
+- Lines in multi-value cells (such as "Used by") and list rows that tie on
+  the sort column no longer move around when the data refreshes. Secrets on
+  image and workload pages are now sorted worst first.
+
 ## [0.3.1] - 2026-10-24
 
 ### Added
