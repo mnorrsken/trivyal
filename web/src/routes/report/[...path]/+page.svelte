@@ -41,7 +41,7 @@
 	);
 	const failed = $derived((r?.checks ?? []).filter((c) => !c.success));
 	const passed = $derived((r?.checks ?? []).filter((c) => c.success));
-	let open = $state<string | null>(null);
+	let open = $state<number | null>(null);
 </script>
 
 <svelte:head><title>{r?.name ?? 'Report'} · trivyal</title></svelte:head>
@@ -76,8 +76,8 @@
 				<table class="table">
 					<thead><tr><th>Severity</th><th>Check</th><th>Message</th></tr></thead>
 					<tbody>
-						{#each failed as c (c.checkID)}
-							<tr class="row" onclick={() => (open = open === c.checkID ? null : c.checkID)}>
+						{#each failed as c, i (c.checkID + i)}
+							<tr class="row" onclick={() => (open = open === i ? null : i)}>
 								<td><SevBadge severity={c.severity} small /></td>
 								<td class="title">
 									<a class="link mono small" href="/checks/{checkType}/{encodeURIComponent(c.checkID)}" onclick={(e) => e.stopPropagation()}
@@ -87,7 +87,7 @@
 								</td>
 								<td class="small ink2">{c.messages?.join(' ') ?? ''}</td>
 							</tr>
-							{#if open === c.checkID}
+							{#if open === i}
 								<tr class="detail">
 									<td colspan="3">
 										<p class="prose-sm">{c.description}</p>
