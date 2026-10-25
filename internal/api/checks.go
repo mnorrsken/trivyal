@@ -97,6 +97,7 @@ func (s *Server) check(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	d.HiddenFindings = uv.hiddenIn(index.Target{Kind: index.TargetCheck, Type: typ, ID: d.Check.ID})
+	slices.SortFunc(d.Resources, byKey)
 	slices.SortStableFunc(d.Resources, func(a, b *index.CheckFinding) int {
 		return cmp.Or(cmp.Compare(boolInt(a.Check.Success), boolInt(b.Check.Success)), cmp.Compare(a.Resource.String(), b.Resource.String()))
 	})

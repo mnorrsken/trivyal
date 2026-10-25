@@ -346,7 +346,7 @@ func (s *Snapshot) Apply(list []Mark) *Snapshot {
 		if !touched[r.Image.Key] {
 			continue
 		}
-		fk := findingKey(r.Image, r.V)
+		fk := findingKey(r.Image.Key, r.V)
 		if seen[fk] {
 			continue
 		}

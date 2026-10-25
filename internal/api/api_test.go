@@ -164,6 +164,24 @@ func TestListPagingAndSort(t *testing.T) {
 	}
 }
 
+func TestPageTiesKeepOrder(t *testing.T) {
+	// The sort sees every item as equal, so only the tie-break
+	// decides their order.
+	sorts := map[string]func(a, b *index.CVEGroup) int{"same": func(a, b *index.CVEGroup) int { return 0 }}
+	p := listParams{page: 1, size: 10}
+	for _, items := range [][]*index.CVEGroup{
+		{{ID: "CVE-2"}, {ID: "CVE-1"}, {ID: "CVE-3"}},
+		{{ID: "CVE-3"}, {ID: "CVE-2"}, {ID: "CVE-1"}},
+	} {
+		for _, sort := range []string{"same", "-same"} {
+			got, _ := page(items, sort, "same", sorts, p)
+			if got[0].ID != "CVE-1" || got[1].ID != "CVE-2" || got[2].ID != "CVE-3" {
+				t.Errorf("sort %s: order %s %s %s", sort, got[0].ID, got[1].ID, got[2].ID)
+			}
+		}
+	}
+}
+
 func TestBadFilter(t *testing.T) {
 	srv := newTestServer(t)
 	var e map[string]string

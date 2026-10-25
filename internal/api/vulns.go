@@ -81,7 +81,8 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 		d.Vulnerabilities = append([]reports.Vulnerability{}, img.Vulns()...)
 		slices.SortStableFunc(d.Vulnerabilities, func(a, b reports.Vulnerability) int {
 			return cmp.Or(cmp.Compare(reports.SeverityRank(a.Severity), reports.SeverityRank(b.Severity)),
-				cmp.Compare(scoreOf(b.Score), scoreOf(a.Score)), cmp.Compare(a.Resource, b.Resource), cmp.Compare(a.ID, b.ID))
+				cmp.Compare(scoreOf(b.Score), scoreOf(a.Score)), cmp.Compare(a.Resource, b.Resource), cmp.Compare(a.ID, b.ID),
+				cmp.Compare(a.InstalledVersion, b.InstalledVersion), cmp.Compare(a.Target, b.Target))
 		})
 	} else {
 		d.Image = &index.Image{Key: sb.Key, Ref: sb.Ref, Digest: sb.Digest, Uses: sb.Uses, Updated: sb.Updated}
@@ -103,6 +104,7 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 		seen[k] = true
 		d.Secrets = append(d.Secrets, index.SecretFindings([]*index.SecretRow{sr})...)
 	}
+	slices.SortFunc(d.Secrets, index.CompareSecrets)
 	writeJSON(w, d)
 }
 
@@ -147,6 +149,7 @@ func (s *Server) cve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f := index.GroupByFinding(rows)
+	slices.SortFunc(f, byKey)
 	slices.SortStableFunc(f, func(a, b *index.Finding) int {
 		return cmp.Or(cmp.Compare(a.Image, b.Image), cmp.Compare(a.Vuln.Resource, b.Vuln.Resource))
 	})
@@ -171,6 +174,7 @@ func (s *Server) vulnerabilitiesCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	matched, _, _ := snap.MatchVulns(p.q, p.stale)
 	f := index.GroupByFinding(matched)
+	slices.SortFunc(f, byKey)
 	slices.SortStableFunc(f, index.FindingSorts["severity"])
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="vulnerabilities.csv"`)

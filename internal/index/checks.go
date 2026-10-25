@@ -2,6 +2,7 @@ package index
 
 import (
 	"cmp"
+	"strings"
 	"time"
 
 	"github.com/mnorrsken/trivyal/internal/query"
@@ -232,6 +233,12 @@ type CheckFinding struct {
 func (g *ResourceGroup) IsFlagged() bool { return g.Flagged }
 func (g *CheckGroup) IsFlagged() bool    { return g.Flagged }
 func (f *CheckFinding) IsFlagged() bool  { return f.Flagged }
+
+func (g *ResourceGroup) SortKey() string { return g.Report.String() }
+func (g *CheckGroup) SortKey() string    { return g.ID }
+func (f *CheckFinding) SortKey() string {
+	return f.Report.String() + "|" + f.Check.ID + "|" + strings.Join(f.Check.Messages, " ")
+}
 
 // AsFinding returns the row as a CheckFinding.
 func (r *CheckRow) AsFinding() *CheckFinding {

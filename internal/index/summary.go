@@ -111,7 +111,7 @@ func (s *Snapshot) Summary() *Summary {
 		if n := ns(w.Namespace); n != nil && r.flagged {
 			n.Flagged = true
 		}
-		k := w.Namespace + "|" + findingKey(r.Image, r.V)
+		k := w.Namespace + "|" + findingKey(r.Image.Key, r.V)
 		if !seenNS[k] {
 			seenNS[k] = true
 			if n := ns(w.Namespace); n != nil {

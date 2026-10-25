@@ -136,6 +136,10 @@ type SecretFinding struct {
 
 func (f *SecretFinding) IsFlagged() bool { return f.Flagged }
 
+func (f *SecretFinding) SortKey() string {
+	return f.Report.String() + "|" + f.Secret.RuleID + "|" + f.Secret.Target + "|" + f.Secret.Match
+}
+
 // SecretFindings flattens secret rows.
 func SecretFindings(rows []*SecretRow) []*SecretFinding {
 	out := make([]*SecretFinding, len(rows))
@@ -146,6 +150,13 @@ func SecretFindings(rows []*SecretRow) []*SecretFinding {
 		}
 	}
 	return out
+}
+
+// CompareSecrets orders the secrets of one image or workload, worst first.
+func CompareSecrets(a, b *SecretFinding) int {
+	return cmp.Or(cmp.Compare(reports.SeverityRank(a.Secret.Severity), reports.SeverityRank(b.Secret.Severity)),
+		cmp.Compare(a.Secret.Target, b.Secret.Target), cmp.Compare(a.Secret.RuleID, b.Secret.RuleID),
+		cmp.Compare(a.Secret.Match, b.Secret.Match), cmp.Compare(a.Report.String(), b.Report.String()))
 }
 
 var SecretSorts = map[string]func(a, b *SecretFinding) int{

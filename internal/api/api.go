@@ -2,6 +2,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -183,7 +184,14 @@ type List struct {
 
 // page sorts items with sortKey ("-" prefix reverses), flagged items first
 // unless turned off, and returns one page.
-func page[T any](items []T, sortKey, def string, sorts map[string]func(a, b T) int, p listParams) ([]T, string) {
+// byKey orders items by identity. Sorting by it before a stable sort keeps
+// equal items in the same order on every request.
+func byKey[T interface{ SortKey() string }](a, b T) int {
+	return cmp.Compare(a.SortKey(), b.SortKey())
+}
+
+func page[T interface{ SortKey() string }](items []T, sortKey, def string, sorts map[string]func(a, b T) int, p listParams) ([]T, string) {
+	slices.SortFunc(items, byKey)
 	fn, ok := sorts[strings.TrimPrefix(sortKey, "-")]
 	if !ok {
 		sortKey, fn = def, sorts[def]

@@ -2,6 +2,7 @@ package index
 
 import (
 	"cmp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,16 @@ type ImageUse struct {
 	Workload  Workload  `json:"workload"`
 	Container string    `json:"container,omitempty"`
 	Report    ReportRef `json:"report"`
+}
+
+// compareWorkloads orders workloads by namespace, name and kind, so lists
+// keep their order between snapshots.
+func compareWorkloads(a, b Workload) int {
+	return cmp.Or(cmp.Compare(a.Namespace, b.Namespace), cmp.Compare(a.Name, b.Name), cmp.Compare(a.Kind, b.Kind))
+}
+
+func compareUses(a, b ImageUse) int {
+	return cmp.Or(compareWorkloads(a.Workload, b.Workload), cmp.Compare(a.Container, b.Container), cmp.Compare(a.Report.Name, b.Report.Name))
 }
 
 // Vulns returns the image's vulnerabilities.
@@ -114,7 +125,7 @@ func (r *VulnRow) Field(name string) []string {
 func (r *VulnRow) Text() string { return r.text }
 
 // Key makes facets count each image's finding once.
-func (r *VulnRow) Key() string { return findingKey(r.Image, r.V) }
+func (r *VulnRow) Key() string { return findingKey(r.Image.Key, r.V) }
 
 func (s *Snapshot) addVulns(kind string, r *reports.VulnerabilityReport, w Workload) {
 	key := imageKey(r.Registry, r.Artifact)
@@ -177,8 +188,8 @@ func (s *Snapshot) MatchVulns(q query.Query, withStale bool) ([]*VulnRow, []quer
 	return out, all, m
 }
 
-func findingKey(img *Image, v *reports.Vulnerability) string {
-	return img.Key + "|" + v.ID + "|" + v.Resource + "|" + v.InstalledVersion + "|" + v.Target
+func findingKey(imageKey string, v *reports.Vulnerability) string {
+	return imageKey + "|" + v.ID + "|" + v.Resource + "|" + v.InstalledVersion + "|" + v.Target
 }
 
 // ImageGroup aggregates matched vulnerabilities per image.
@@ -215,7 +226,7 @@ func GroupByImage(rows []*VulnRow) []*ImageGroup {
 			seenW[wk] = true
 			g.Workloads = append(g.Workloads, r.Use.Workload)
 		}
-		fk := findingKey(r.Image, r.V)
+		fk := findingKey(r.Image.Key, r.V)
 		if seen[fk] {
 			continue
 		}
@@ -224,6 +235,9 @@ func GroupByImage(rows []*VulnRow) []*ImageGroup {
 		if r.V.FixedVersion != "" {
 			g.Fixable++
 		}
+	}
+	for _, g := range order {
+		slices.SortFunc(g.Workloads, compareWorkloads)
 	}
 	return order
 }
@@ -258,7 +272,7 @@ func GroupByWorkload(rows []*VulnRow) []*WorkloadGroup {
 			seenImg[ik] = true
 			g.Images = append(g.Images, r.Image.Ref)
 		}
-		fk := k + "|" + findingKey(r.Image, r.V)
+		fk := k + "|" + findingKey(r.Image.Key, r.V)
 		if seen[fk] {
 			continue
 		}
@@ -267,6 +281,9 @@ func GroupByWorkload(rows []*VulnRow) []*WorkloadGroup {
 		if r.V.FixedVersion != "" {
 			g.Fixable++
 		}
+	}
+	for _, g := range order {
+		slices.Sort(g.Images)
 	}
 	return order
 }
@@ -318,6 +335,9 @@ func GroupByCVE(rows []*VulnRow) []*CVEGroup {
 			g.Packages = append(g.Packages, v.Resource)
 		}
 	}
+	for _, g := range order {
+		slices.Sort(g.Packages)
+	}
 	return order
 }
 
@@ -337,7 +357,7 @@ func GroupByFinding(rows []*VulnRow) []*Finding {
 	seenW := map[string]bool{}
 	var order []*Finding
 	for _, r := range rows {
-		k := findingKey(r.Image, r.V)
+		k := findingKey(r.Image.Key, r.V)
 		f := groups[k]
 		if f == nil {
 			f = &Finding{ImageKey: r.Image.Key, Image: r.Image.Ref, ImageName: r.Image.Name, Vuln: r.V}
@@ -350,6 +370,9 @@ func GroupByFinding(rows []*VulnRow) []*Finding {
 			f.Workloads = append(f.Workloads, r.Use.Workload)
 		}
 	}
+	for _, f := range order {
+		slices.SortFunc(f.Workloads, compareWorkloads)
+	}
 	return order
 }
 
@@ -359,6 +382,13 @@ func (g *ImageGroup) IsFlagged() bool    { return g.Flagged }
 func (g *WorkloadGroup) IsFlagged() bool { return g.Flagged }
 func (g *CVEGroup) IsFlagged() bool      { return g.Flagged }
 func (f *Finding) IsFlagged() bool       { return f.Flagged }
+
+// SortKey identifies the item. Lists sort by it first, so items that are
+// equal under the chosen order keep their place between snapshots.
+func (g *ImageGroup) SortKey() string    { return g.Key }
+func (g *WorkloadGroup) SortKey() string { return g.Workload.String() }
+func (g *CVEGroup) SortKey() string      { return g.ID }
+func (f *Finding) SortKey() string       { return findingKey(f.ImageKey, f.Vuln) }
 
 // FlaggedFirst orders flagged items before the others.
 func FlaggedFirst[T interface{ IsFlagged() bool }](a, b T) int {

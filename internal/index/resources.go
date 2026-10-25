@@ -44,7 +44,7 @@ func (s *Snapshot) WorkloadStats() map[string]*WorkloadStat {
 			seen[ik] = true
 			st.Images++
 		}
-		fk := w.String() + "|" + findingKey(r.Image, r.V)
+		fk := w.String() + "|" + findingKey(r.Image.Key, r.V)
 		if seen[fk] {
 			continue
 		}
@@ -126,7 +126,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 			})
 		}
 	}
-	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int { return cmp.Compare(a.Container, b.Container) })
+	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int { return cmp.Or(cmp.Compare(a.Container, b.Container), cmp.Compare(a.Key, b.Key)) })
 	if s.hidden || s.flags {
 		// What is hidden or flagged can differ per workload: go through this
 		// workload's rows, and count them when some are hidden.
@@ -148,7 +148,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 				continue
 			}
 			wi.Flagged = wi.Flagged || r.flagged
-			fk := k + "|" + findingKey(r.Image, r.V)
+			fk := k + "|" + findingKey(r.Image.Key, r.V)
 			if !s.hidden || seen[fk] {
 				continue
 			}
@@ -179,6 +179,7 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 			out.Secrets = append(out.Secrets, SecretFindings([]*SecretRow{r})...)
 		}
 	}
+	slices.SortFunc(out.Secrets, CompareSecrets)
 	for _, info := range s.SBOMs {
 		for _, u := range info.Uses {
 			if sameWorkload(u.Workload, res) {

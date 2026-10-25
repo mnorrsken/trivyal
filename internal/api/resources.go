@@ -44,6 +44,7 @@ type WorkloadRow struct {
 }
 
 func (r *WorkloadRow) IsFlagged() bool { return r.Flagged }
+func (r *WorkloadRow) SortKey() string  { return r.String() }
 
 // WorkloadSchema lists the filters for the workload list.
 var WorkloadSchema = query.Schema{
@@ -315,6 +316,7 @@ func (s *Server) namespace(w http.ResponseWriter, r *http.Request) {
 			isWorkload[wr.String()] = true
 		}
 	}
+	slices.SortFunc(d.WorkloadList, byKey)
 	slices.SortStableFunc(d.WorkloadList, workloadSorts["severity"])
 	slices.SortStableFunc(d.WorkloadList, index.FlaggedFirst)
 	inNS := func(w index.Workload) bool { return w.Namespace == name }

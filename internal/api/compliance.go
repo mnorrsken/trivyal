@@ -90,6 +90,7 @@ func (s *Server) complianceControl(w http.ResponseWriter, r *http.Request) {
 			d.Failing = append(d.Failing, &ControlFinding{Type: row.Type, CheckFinding: row.AsFinding()})
 		}
 	}
+	slices.SortFunc(d.Failing, byKey)
 	slices.SortStableFunc(d.Failing, func(a, b *ControlFinding) int {
 		return cmp.Or(cmp.Compare(a.Resource.String(), b.Resource.String()), cmp.Compare(a.Check.ID, b.Check.ID))
 	})

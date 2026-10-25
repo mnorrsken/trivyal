@@ -1,6 +1,7 @@
 package index
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mnorrsken/trivyal/internal/fixture"
@@ -98,6 +99,37 @@ func TestGroupings(t *testing.T) {
 		rows, _, _ := s.MatchVulns(q, false)
 		if len(GroupByImage(rows)) != 1 {
 			t.Errorf("ns:demo should match one image")
+		}
+	}
+}
+
+func TestGroupListsSorted(t *testing.T) {
+	s := snapshot(t)
+	rows, _, _ := s.MatchVulns(query.Query{}, false)
+	slices.Reverse(rows)
+	for _, g := range GroupByImage(rows) {
+		if !slices.IsSortedFunc(g.Workloads, compareWorkloads) {
+			t.Errorf("image %s workloads not sorted: %v", g.Ref, g.Workloads)
+		}
+	}
+	for _, g := range GroupByWorkload(rows) {
+		if !slices.IsSorted(g.Images) {
+			t.Errorf("workload %s images not sorted: %v", g.Workload, g.Images)
+		}
+	}
+	for _, g := range GroupByCVE(rows) {
+		if !slices.IsSorted(g.Packages) {
+			t.Errorf("cve %s packages not sorted: %v", g.ID, g.Packages)
+		}
+	}
+	for _, f := range GroupByFinding(rows) {
+		if !slices.IsSortedFunc(f.Workloads, compareWorkloads) {
+			t.Errorf("finding %s workloads not sorted: %v", f.Vuln.ID, f.Workloads)
+		}
+	}
+	for _, img := range s.Images {
+		if !slices.IsSortedFunc(img.Uses, compareUses) {
+			t.Errorf("image %s uses not sorted", img.Ref)
 		}
 	}
 }

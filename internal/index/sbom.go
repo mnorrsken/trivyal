@@ -170,6 +170,8 @@ type ComponentGroup struct {
 	Images   []string `json:"images"`
 }
 
+func (g *ComponentGroup) SortKey() string { return g.Name + "@" + g.Version + "|" + g.PkgType }
+
 // GroupByComponent lists each component version once.
 func GroupByComponent(rows []*ComponentRow) []*ComponentGroup {
 	groups := map[string]*ComponentGroup{}
@@ -197,6 +199,8 @@ type SBOMGroup struct {
 	*SBOMInfo
 	Matched int `json:"matched"`
 }
+
+func (g *SBOMGroup) SortKey() string { return g.Key }
 
 // GroupBySBOM counts matched components per image.
 func GroupBySBOM(rows []*ComponentRow) []*SBOMGroup {

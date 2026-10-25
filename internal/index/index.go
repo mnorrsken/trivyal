@@ -3,6 +3,7 @@
 package index
 
 import (
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -67,6 +68,8 @@ type ReportRef struct {
 	Namespace string `json:"namespace,omitempty"`
 	Name      string `json:"name"`
 }
+
+func (r ReportRef) String() string { return r.Type + "/" + r.Namespace + "/" + r.Name }
 
 // Snapshot is an immutable view over all reports at one point in time.
 type Snapshot struct {
@@ -189,6 +192,13 @@ func (s *Snapshot) add(kind string, it any, res *resolver) {
 func (s *Snapshot) finish() {
 	s.markDuplicateChecks()
 	s.finishSBOM()
+	// Reports come from the informer in random order.
+	for _, img := range s.Images {
+		slices.SortFunc(img.Uses, compareUses)
+	}
+	for _, info := range s.SBOMs {
+		slices.SortFunc(info.Uses, compareUses)
+	}
 }
 
 // ImageRef formats registry, repository and tag the way users write images.
