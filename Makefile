@@ -12,7 +12,7 @@ WEB_OUT := internal/web/dist/app
 # outside the repo on purpose; the check is skipped when the file is missing.
 LEAK_DENYLIST ?= $(HOME)/.config/trivyal/leak-denylist
 
-.PHONY: all build build-go run dev web web-deps test go-test web-test race vet fmt lint leakcheck helm-lint clean docker-build scan lab lab-down
+.PHONY: all build build-go run dev web web-deps test go-test web-test race vet fmt lint vuln leakcheck helm-lint clean docker-build scan lab lab-down
 
 all: build
 
@@ -60,6 +60,9 @@ fmt:
 
 lint:
 	golangci-lint run
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
 leakcheck:
 	@if [ -s "$(LEAK_DENYLIST)" ]; then \
