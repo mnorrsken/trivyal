@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-31
+
+### Changed
+
+- Web dependency update: svelte 5.57.3.
+
 ## [0.3.2] - 2026-10-25
 
 ### Fixed
