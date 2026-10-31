@@ -126,7 +126,9 @@ func (s *Snapshot) ForWorkload(res reports.Resource) *WorkloadReports {
 			})
 		}
 	}
-	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int { return cmp.Or(cmp.Compare(a.Container, b.Container), cmp.Compare(a.Key, b.Key)) })
+	slices.SortFunc(out.Images, func(a, b *WorkloadImage) int {
+		return cmp.Or(cmp.Compare(a.Container, b.Container), cmp.Compare(a.Key, b.Key))
+	})
 	if s.hidden || s.flags {
 		// What is hidden or flagged can differ per workload: go through this
 		// workload's rows, and count them when some are hidden.

@@ -44,7 +44,7 @@ type WorkloadRow struct {
 }
 
 func (r *WorkloadRow) IsFlagged() bool { return r.Flagged }
-func (r *WorkloadRow) SortKey() string  { return r.String() }
+func (r *WorkloadRow) SortKey() string { return r.String() }
 
 // WorkloadSchema lists the filters for the workload list.
 var WorkloadSchema = query.Schema{
