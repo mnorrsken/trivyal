@@ -18,9 +18,9 @@ type Source struct {
 	jobs   []reports.ScanJob
 }
 
-func (f *Source) Reports(resource string) []any   { return f.objs[resource] }
-func (f *Source) Installed() bool                 { return true }
-func (f *Source) ScanJobs() []reports.ScanJob     { return f.jobs }
+func (f *Source) Reports(resource string) []any { return f.objs[resource] }
+func (f *Source) Installed() bool               { return true }
+func (f *Source) ScanJobs() []reports.ScanJob   { return f.jobs }
 func (f *Source) Owner(kind, ns, name string) (reports.Owner, bool) {
 	o, ok := f.owners[kind+"/"+ns+"/"+name]
 	return o, ok
