@@ -86,7 +86,7 @@ func checkReport(kind, ns, name, resKind, resName string, checks ...map[string]a
 	for i, c := range checks {
 		list[i] = c
 	}
-	o["report"] = map[string]any{"scanner": map[string]any{"name": "Trivy"}, "summary": map[string]any{}, "checks": list}
+	o["report"] = map[string]any{"scanner": map[string]any{"name": "Trivy", "version": "0.0.2"}, "summary": map[string]any{}, "checks": list}
 	return o
 }
 

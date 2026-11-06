@@ -308,6 +308,10 @@ func TestSummaryAndHealth(t *testing.T) {
 	if !s.Synced || s.Vulns.Images != 4 {
 		t.Errorf("summary = %+v", s)
 	}
+	// Check reports carry trivy-operator's version, not Trivy's.
+	if strings.Join(s.Scanners, ", ") != "Operator 0.0.2, Trivy 0.0.1" {
+		t.Errorf("scanners = %v", s.Scanners)
+	}
 	get(t, srv, "/healthz", http.StatusOK, nil)
 	get(t, srv, "/readyz", http.StatusOK, nil)
 }

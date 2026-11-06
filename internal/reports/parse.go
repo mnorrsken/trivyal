@@ -156,6 +156,11 @@ func ParseCheckReport(data []byte) (*CheckReport, error) {
 		return nil, fmt.Errorf("decoding check report: %w", err)
 	}
 	rp := raw.Report
+	// trivy-operator runs these checks itself and records its own version
+	// under the name "Trivy"; name it so it is not taken for a Trivy release.
+	if rp.Scanner.Name == "Trivy" {
+		rp.Scanner.Name = "Operator"
+	}
 	return &CheckReport{
 		Common:  raw.common(rp.UpdateTimestamp, rp.Scanner),
 		Summary: rp.Summary,

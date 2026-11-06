@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Fixed
+
+- Config audit, RBAC and infra reports showed trivy-operator's version as
+  "Trivy X" (on the dashboard, the Scans page and report pages). They now
+  say "Operator X", so it is not mixed up with the Trivy scanner version of
+  image scans.
+
 ## [0.4.0] - 2026-11-06
 
 ### Added
