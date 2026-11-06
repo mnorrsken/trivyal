@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-06
+
 ### Fixed
 
 - Config audit, RBAC and infra reports showed trivy-operator's version as
