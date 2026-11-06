@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
 ### Added
 
 - Scans page (`/scans`, `GET /api/v1/scans`): running and failed trivy-operator
