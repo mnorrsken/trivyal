@@ -141,6 +141,10 @@ func TestLists(t *testing.T) {
 		{"/api/v1/sbom", 2, "component"},
 		{"/api/v1/sbom?group=image&q=name:zlib", 1, "image"},
 		{"/api/v1/workloads?q=sev:critical", 1, "workload"},
+		// 17 reports (not the old ReplicaSet's), a running and a failed job.
+		{"/api/v1/scans", 19, "scan"},
+		{"/api/v1/scans?stale=1", 20, "scan"},
+		{"/api/v1/scans?q=type:vulnerability+ns:shop", 5, "scan"},
 	}
 	for _, tt := range tests {
 		var l list
@@ -267,6 +271,30 @@ func TestResources(t *testing.T) {
 	get(t, srv, "/api/v1/search?q=node", http.StatusOK, &hits)
 	if len(hits) == 0 || hits[len(hits)-1].Kind != "node" {
 		t.Errorf("search hits = %+v", hits)
+	}
+}
+
+func TestScans(t *testing.T) {
+	srv := newTestServer(t)
+	var l struct {
+		list
+		Running int `json:"running"`
+	}
+	get(t, srv, "/api/v1/scans?size=3", http.StatusOK, &l)
+	// Running first, then failed, then the newest report.
+	first, second, third := l.Items[0], l.Items[1], l.Items[2]
+	wl, _ := first["workload"].(map[string]any)
+	if l.Running != 1 || l.Sort != "recent" || first["state"] != "running" || wl["kind"] != "Deployment" || wl["name"] != "web" {
+		t.Errorf("first scan = %+v, running %d", first, l.Running)
+	}
+	if second["state"] != "failed" || second["message"] == "" || third["type"] != "compliance" {
+		t.Errorf("second, third = %+v, %+v", second, third)
+	}
+	for q, want := range map[string]int{"age:1h": 1, "age:24h": 2, "-age:7d": 17, "state:failed": 1, "time:>=2026-01-02": 9} {
+		get(t, srv, "/api/v1/scans?q="+q, http.StatusOK, &l)
+		if l.Total != want {
+			t.Errorf("%s: %d scans, want %d", q, l.Total, want)
+		}
 	}
 }
 

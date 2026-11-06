@@ -17,6 +17,7 @@ type Source interface {
 	Reports(resource string) []any
 	Owner(kind, namespace, name string) (reports.Owner, bool)
 	Installed() bool
+	ScanJobs() []reports.ScanJob
 }
 
 // Index caches a snapshot of all reports and rebuilds it when invalidated.
@@ -84,6 +85,7 @@ type Snapshot struct {
 	Components  []*ComponentRow
 	SBOMs       map[string]*SBOMInfo // by image key
 	Compliance  []*reports.ComplianceReport
+	Scans       []*Scan
 
 	// Raw parsed reports by ReportRef, for detail pages.
 	ReportsByRef map[ReportRef]any
@@ -147,6 +149,9 @@ func build(src Source) *Snapshot {
 			s.add(kind, it, res)
 		}
 	}
+	for _, j := range src.ScanJobs() {
+		s.addScanJob(j, res)
+	}
 	s.finish()
 	return s
 }
@@ -171,21 +176,26 @@ func (s *Snapshot) add(kind string, it any, res *resolver) {
 		s.track(kind, &r.Common)
 		s.ReportsByRef[ReportRef{kind, r.Namespace, r.Name}] = r
 		s.addVulns(kind, r, res.workload(r.Resource))
+		s.addScan(kind, &r.Common, res.workload(r.Resource), scanImage(r.Container, r.Registry, r.Artifact), &r.Summary)
 	case *reports.CheckReport:
 		s.track(kind, &r.Common)
 		s.ReportsByRef[ReportRef{kind, r.Namespace, r.Name}] = r
 		s.addChecks(kind, r, res.workload(r.Resource))
+		s.addScan(kind, &r.Common, res.workload(r.Resource), nil, &r.Summary)
 	case *reports.ExposedSecretReport:
 		s.track(kind, &r.Common)
 		s.ReportsByRef[ReportRef{kind, r.Namespace, r.Name}] = r
 		s.addSecrets(kind, r, res.workload(r.Resource))
+		s.addScan(kind, &r.Common, res.workload(r.Resource), scanImage(r.Container, r.Registry, r.Artifact), &r.Summary)
 	case *reports.SBOMReport:
 		s.track(kind, &r.Common)
 		s.ReportsByRef[ReportRef{kind, r.Namespace, r.Name}] = r
 		s.addSBOM(kind, r, res.workload(r.Resource))
+		s.addScan(kind, &r.Common, res.workload(r.Resource), scanImage(r.Container, r.Registry, r.Artifact), nil).Components = &r.Summary.Components
 	case *reports.ComplianceReport:
 		s.ReportsByRef[ReportRef{kind, "", r.Name}] = r
 		s.Compliance = append(s.Compliance, r)
+		s.addComplianceScan(kind, r)
 	}
 }
 

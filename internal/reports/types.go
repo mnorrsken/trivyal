@@ -268,6 +268,33 @@ type Control struct {
 	Manual bool `json:"manual,omitempty"`
 }
 
+// Scan job types and states.
+const (
+	JobVulnerability = "vulnerability" // image scan: vulnerabilities, secrets, SBOM
+	JobInfra         = "infra"         // node collector
+
+	JobRunning = "running"
+	JobDone    = "done"
+	JobFailed  = "failed"
+)
+
+// ScanJob is a Job trivy-operator runs to scan a workload's images or to
+// collect a node's settings. The operator deletes jobs once it has read
+// their result, so the cache mostly holds running ones.
+type ScanJob struct {
+	Namespace string
+	Name      string
+	Type      string
+	State     string
+	Resource  Resource
+	// Images maps container names to the images the job scans.
+	Images   map[string]string
+	Started  time.Time
+	Finished time.Time
+	// Message is the reason a failed job gives.
+	Message string
+}
+
 // Owner is the controller owner of a ReplicaSet or Job, used to map reports
 // to the workload a user knows (Deployment, CronJob).
 type Owner struct {

@@ -24,6 +24,7 @@
 		{ href: '/checks/infra', label: 'Infrastructure' },
 		{ href: '/compliance', label: 'Compliance' },
 		{ href: '/sbom', label: 'SBOM' },
+		{ href: '/scans', label: 'Scans' },
 		{ href: '/marks', label: 'Flagged & hidden' }
 	];
 	const clusterNav = [

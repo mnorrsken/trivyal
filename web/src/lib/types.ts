@@ -184,6 +184,31 @@ export interface SecretFinding {
 	flagged?: boolean;
 }
 
+export interface ScanImage {
+	container?: string;
+	image: string;
+	key?: string;
+}
+
+/** A running or failed scan job, or the last scan a report records. */
+export interface Scan {
+	state: 'running' | 'failed' | 'done';
+	type: string;
+	time: string;
+	finished?: string;
+	resource: Resource;
+	workload: Workload;
+	images?: ScanImage[];
+	report?: ReportRef;
+	job?: { namespace: string; name: string };
+	scanner?: string;
+	message?: string;
+	summary?: Counts;
+	components?: number;
+	pass?: number;
+	fail?: number;
+}
+
 export interface SBOMInfo {
 	key: string;
 	ref: string;

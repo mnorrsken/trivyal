@@ -20,7 +20,9 @@ flowchart LR
    Informer transforms parse reports into the small Go types in
    `internal/reports` and drop the raw objects; SBOMs keep only the fields
    the UI shows. The full CycloneDX document is fetched from the API on
-   download.
+   download. The Job transform keeps labels, the container-images annotation
+   and status only for trivy-operator scan jobs (image scan and node
+   collector), so the scans list can show them.
 2. Every informer event marks the index stale and schedules a debounced
    Server-Sent Event. `internal/index` rebuilds one immutable snapshot on
    the next request: rows per finding, images keyed by digest, owner
@@ -31,6 +33,11 @@ flowchart LR
    rows, computes facet counts (each facet ignores its own term), groups,
    sorts and pages on the server, so the browser never gets thousands of
    rows.
+   The scans list (`GET /api/v1/scans`, not `/events`, which is the SSE
+   stream) is built in the same snapshot: running or failed scan Jobs, plus one
+   "done" entry per report at its update time. Completed Jobs are left out
+   because their report is listed. A rescan replaces the report, so only the
+   last scan per resource is known. Marks do not apply.
 4. `internal/store` keeps the marks (bun ORM, pure-Go SQLite, so
    `CGO_ENABLED=0` still works; bun leaves PostgreSQL possible later). Tables
    `users` and `marks`; migrations are bun Go migrations in

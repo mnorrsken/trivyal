@@ -48,6 +48,15 @@ const (
 	LabelContainerName     = "trivy-operator.container.name"
 )
 
+// Labels and annotations set by trivy-operator on its scan jobs.
+const (
+	LabelManagedBy            = "app.kubernetes.io/managed-by"
+	ManagedByTrivyOperator    = "trivy-operator"
+	LabelVulnScanner          = "vulnerabilityReport.scanner"
+	LabelNodeInfoCollector    = "node-info.collector"
+	AnnotationContainerImages = "trivy-operator.container-images"
+)
+
 type rawMeta struct {
 	Kind     string `json:"kind"`
 	Metadata struct {

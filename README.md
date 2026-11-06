@@ -17,6 +17,8 @@ of flagged and hidden items is stored, in a small SQLite file.
   bookmarked.
 - **Global search** (`⌘K` / `Ctrl-K` or `/`) for namespaces, workloads, pods,
   nodes, images, CVEs, checks and packages.
+- **Scans**: running and failed scan jobs and when each resource was last
+  scanned.
 - **Live**: pages update when trivy-operator writes new reports.
 - Findings are counted once per image, even when several workloads run it.
   Old ReplicaSet revisions (scaled to zero) are hidden unless you ask for them.

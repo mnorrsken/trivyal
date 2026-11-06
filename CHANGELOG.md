@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Added
+
+- Scans page (`/scans`, `GET /api/v1/scans`): running and failed trivy-operator
+  scan jobs (image scans and node collectors) plus the last scan of every
+  report, with filters for state, type, age, namespace, kind, workload and
+  image. Finished jobs are left out because their report is listed, and
+  trivy-operator deletes jobs soon after they end, so failures show briefly.
+
 ## [0.3.3] - 2026-10-31
 
 ### Changed

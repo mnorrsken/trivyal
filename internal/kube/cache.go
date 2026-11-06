@@ -291,6 +291,9 @@ func trimOwner(in any) (any, error) {
 			Spec:       appsv1.ReplicaSetSpec{Replicas: o.Spec.Replicas},
 		}, nil
 	case *batchv1.Job:
+		if isScanJob(o) {
+			return trimScanJob(o), nil
+		}
 		return &batchv1.Job{ObjectMeta: trimMeta(o.ObjectMeta)}, nil
 	}
 	return in, nil

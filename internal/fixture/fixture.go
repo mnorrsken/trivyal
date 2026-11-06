@@ -4,6 +4,7 @@ package fixture
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/mnorrsken/trivyal/internal/reports"
 )
@@ -14,10 +15,12 @@ import (
 type Source struct {
 	objs   map[string][]any
 	owners map[string]reports.Owner // "Kind/ns/name"
+	jobs   []reports.ScanJob
 }
 
-func (f *Source) Reports(resource string) []any { return f.objs[resource] }
-func (f *Source) Installed() bool               { return true }
+func (f *Source) Reports(resource string) []any   { return f.objs[resource] }
+func (f *Source) Installed() bool                 { return true }
+func (f *Source) ScanJobs() []reports.ScanJob     { return f.jobs }
 func (f *Source) Owner(kind, ns, name string) (reports.Owner, bool) {
 	o, ok := f.owners[kind+"/"+ns+"/"+name]
 	return o, ok
@@ -108,6 +111,9 @@ func parse(t testing.TB, resource string, obj map[string]any) any {
 //	demo/CronJob backup  -> Job backup-1, image tools:2
 //	shop/Cluster db      -> Pods db-1, db-2 (custom resource owner), image db:16
 //	kube-system/Pod etcd-node-a, a static pod owned by its Node
+//
+// and three scan jobs: one running for ReplicaSet web-new (started a minute
+// ago), one done and one failed node collector for node-a.
 func New(t testing.TB) *Source {
 	t.Helper()
 	three, zero := int32(3), int32(0)
@@ -217,5 +223,23 @@ func New(t testing.TB) *Source {
 		},
 	}
 	add(reports.ClusterComplianceReports, comp)
+
+	now := time.Now()
+	src.jobs = []reports.ScanJob{
+		{
+			Namespace: "trivy-system", Name: "scan-vulnerabilityreport-abc", Type: reports.JobVulnerability, State: reports.JobRunning,
+			Resource: reports.Resource{Kind: "ReplicaSet", Namespace: "shop", Name: "web-new"},
+			Images:   map[string]string{"web": "registry.example.com/shop/web:1.1"}, Started: now.Add(-time.Minute),
+		},
+		{
+			Namespace: "trivy-system", Name: "node-collector-done", Type: reports.JobInfra, State: reports.JobDone,
+			Resource: reports.Resource{Kind: "Node", Name: "node-a"}, Started: now.Add(-3 * time.Hour), Finished: now.Add(-3 * time.Hour),
+		},
+		{
+			Namespace: "trivy-system", Name: "node-collector-xyz", Type: reports.JobInfra, State: reports.JobFailed,
+			Resource: reports.Resource{Kind: "Node", Name: "node-a"}, Started: now.Add(-2 * time.Hour), Finished: now.Add(-2 * time.Hour),
+			Message: "Job has reached the specified backoff limit",
+		},
+	}
 	return src
 }

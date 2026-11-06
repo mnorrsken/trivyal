@@ -96,3 +96,56 @@ func TestWorkloadsAndOwners(t *testing.T) {
 		t.Errorf("Owner(ReplicaSet web-1) = %+v, %v", o, ok)
 	}
 }
+
+func TestScanJobs(t *testing.T) {
+	op := map[string]string{reports.LabelManagedBy: reports.ManagedByTrivyOperator}
+	with := func(extra map[string]string) map[string]string {
+		m := map[string]string{}
+		for k, v := range op {
+			m[k] = v
+		}
+		for k, v := range extra {
+			m[k] = v
+		}
+		return m
+	}
+	started := metav1.Now()
+	c := testCache(t,
+		&batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "trivy-system", Name: "scan-vulnerabilityreport-1",
+				Labels: with(map[string]string{
+					reports.LabelVulnScanner: "Trivy", reports.LabelResourceKind: "ReplicaSet",
+					reports.LabelResourceNamespace: "shop", reports.LabelResourceName: "web-1",
+				}),
+				Annotations: map[string]string{reports.AnnotationContainerImages: `{"web":"registry.example.com/shop/web:1.0"}`},
+			},
+			Status: batchv1.JobStatus{StartTime: &started},
+		},
+		&batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "trivy-system", Name: "node-collector-1",
+				Labels: with(map[string]string{reports.LabelNodeInfoCollector: "Trivy", reports.LabelResourceName: "node-a"}),
+			},
+			Status: batchv1.JobStatus{Conditions: []batchv1.JobCondition{
+				{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded", LastTransitionTime: started},
+			}},
+		},
+		// Not a scan job.
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Namespace: "shop", Name: "migrate", Labels: op}},
+	)
+	got := map[string]reports.ScanJob{}
+	for _, j := range c.ScanJobs() {
+		got[j.Name] = j
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d scan jobs, want 2: %+v", len(got), got)
+	}
+	v := got["scan-vulnerabilityreport-1"]
+	if v.Type != reports.JobVulnerability || v.State != reports.JobRunning || v.Resource != (reports.Resource{Kind: "ReplicaSet", Namespace: "shop", Name: "web-1"}) ||
+		v.Images["web"] != "registry.example.com/shop/web:1.0" || !v.Started.Equal(started.Time) {
+		t.Errorf("vulnerability job = %+v", v)
+	}
+	n := got["node-collector-1"]
+	if n.Type != reports.JobInfra || n.State != reports.JobFailed || n.Resource.Kind != "Node" || n.Resource.Name != "node-a" || n.Message != "BackoffLimitExceeded" || n.Finished.IsZero() {
+		t.Errorf("node collector job = %+v", n)
+	}
+}

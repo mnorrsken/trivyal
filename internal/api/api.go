@@ -67,6 +67,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/report/{type}/{name}", s.report)
 	mux.HandleFunc("GET /api/v1/report/{type}/{ns}/{name}", s.report)
 	mux.HandleFunc("GET /api/v1/search", s.search)
+	mux.HandleFunc("GET /api/v1/scans", s.scans)
 	s.registerResources(mux)
 	s.registerMarks(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
@@ -134,6 +135,7 @@ func (s *Server) schema(w http.ResponseWriter, _ *http.Request) {
 		"secrets":         toFields(index.SecretSchema),
 		"sbom":            toFields(index.ComponentSchema),
 		"workloads":       toFields(WorkloadSchema),
+		"scans":           toFields(index.ScanSchema),
 	})
 }
 
