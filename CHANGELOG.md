@@ -3,7 +3,14 @@
 All notable changes to this project are documented here. Headings use
 `## [X.Y.Z] - YYYY-MM-DD`; the release workflow takes the notes from them.
 
-## [Unreleased]
+## [0.4.2] - 2026-11-08
+
+### Security
+
+- Update github.com/go-jose/go-jose/v4 to 4.1.8. It is used to check OIDC
+  tokens. Version 4.1.7 fixed five advisories: RSA key size limits in
+  thumbprints and certificate checks, limits on JWE/JWS recipients and
+  signatures, header detection, and a JSON embedded-field fix.
 
 ### Changed
 
@@ -11,6 +18,9 @@ All notable changes to this project are documented here. Headings use
   refreshes. Other pages blinked every 20 seconds or so because any cluster
   change (even a node status update) made them refetch; they now show the
   state when opened and still refresh after you flag or hide something.
+- Dependency updates: k8s.io/api, apimachinery and client-go 0.37.2,
+  modernc.org/sqlite 1.61.1. Web: @sveltejs/kit 3.1.1, adapter-static 4.0.1,
+  @tailwindcss/vite 4.3.4, svelte-check 4.7.8, vitest 5.1.0.
 
 ## [0.4.1] - 2026-11-06
 
