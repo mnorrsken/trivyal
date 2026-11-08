@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+### Changed
+
+- Only the Scans page updates live, and it no longer dims while it
+  refreshes. Other pages blinked every 20 seconds or so because any cluster
+  change (even a node status update) made them refetch; they now show the
+  state when opened and still refresh after you flag or hide something.
+
 ## [0.4.1] - 2026-11-06
 
 ### Fixed

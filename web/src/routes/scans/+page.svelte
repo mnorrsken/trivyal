@@ -20,7 +20,9 @@
 	$effect(() => {
 		const p = ls.params;
 		live.generation;
-		f.run(() => api<ScanList>('scans', p));
+		// This list follows the cluster; refreshes do not dim it.
+		live.cluster;
+		f.run(() => api<ScanList>('scans', p), JSON.stringify(p));
 	});
 	const d = $derived(f.data);
 	const sort = $derived(d?.sort ?? '');

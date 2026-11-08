@@ -44,8 +44,10 @@ flowchart LR
    `internal/store/migrations`. Marks belong to a user, but there is only one
    "anonymous" user for now, also with OIDC on. Without `-database-url` the
    marks live in memory. Changing a mark changes the SSE generation.
-5. The SPA keeps all list state in the URL and refetches when the SSE
-   generation changes.
+5. The SPA keeps all list state in the URL. Only the scans list refetches
+   when the SSE generation changes, without dimming; node status updates
+   alone change it every 20 seconds or so, which made every page blink. Other
+   pages refetch on navigation and after a mark is changed in the browser.
 
 ## Counting rules
 

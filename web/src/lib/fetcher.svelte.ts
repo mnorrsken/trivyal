@@ -6,14 +6,25 @@ export class Fetcher<T> {
 	error = $state<string | null>(null);
 	loading = $state(false);
 	#seq = 0;
+	#key: string | undefined;
+	// Plain field: run() is called inside effects, and reading this.data
+	// there would make every result trigger another run.
+	#loaded = false;
 
-	async run(fn: () => Promise<T>) {
+	/**
+	 * Runs fn. With a key, a rerun for the same key (a live refresh) keeps
+	 * loading off, so the page does not dim.
+	 */
+	async run(fn: () => Promise<T>, key?: string) {
 		const seq = ++this.#seq;
-		this.loading = true;
+		const same = key !== undefined && key === this.#key && this.#loaded;
+		this.#key = key;
+		if (!same) this.loading = true;
 		try {
 			const d = await fn();
 			if (seq !== this.#seq) return;
 			this.data = d;
+			this.#loaded = true;
 			this.error = null;
 		} catch (e) {
 			if (seq !== this.#seq) return;
