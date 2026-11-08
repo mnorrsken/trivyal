@@ -22,8 +22,16 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
 
 # distroless: no shell or package manager, so the image trivyal shows
 # in its own reports stays small.
-FROM gcr.io/distroless/static:nonroot
-COPY --from=builder /out/trivyal /trivyal
+FROM gcr.io/distroless/static:nonroot AS runtime
 USER 65532:65532
 EXPOSE 8080 9090
 ENTRYPOINT ["/trivyal"]
+
+# Release builds (release.yml): the binaries the release job already
+# built, from the named build context "dist", so nothing compiles twice.
+FROM runtime AS prebuilt
+ARG TARGETOS TARGETARCH
+COPY --from=dist --chmod=0755 trivyal_*_${TARGETOS}_${TARGETARCH} /trivyal
+
+FROM runtime
+COPY --from=builder /out/trivyal /trivyal

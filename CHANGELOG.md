@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Headings use
 `## [X.Y.Z] - YYYY-MM-DD`; the release workflow takes the notes from them.
 
+## [Unreleased]
+
+### Changed
+
+- Releases ship Linux binaries only (amd64, arm64). On macOS, build with
+  `make build`.
+
 ## [0.4.2] - 2026-11-08
 
 ### Security

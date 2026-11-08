@@ -39,3 +39,8 @@ lives outside the repo on purpose.
 - Changelog heading `## [X.Y.Z] - YYYY-MM-DD`.
 - `release.yml` on `v*` tags: tests, multi-arch image, chart (version set
   from the tag), binaries and the GitHub release.
+- Web and Go are built once per release, in the `build` job, for Linux
+  only (no darwin binaries; on macOS use `make build`). The image is
+  the Dockerfile's `prebuilt` target, which copies those binaries from the
+  named build context `dist`. The default target still builds from source
+  (CI, `make docker-build`).
