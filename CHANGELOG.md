@@ -5,10 +5,16 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-14
+
 ### Changed
 
 - Releases ship Linux binaries only (amd64, arm64). On macOS, build with
   `make build`.
+- Dependency updates: github.com/go-jose/go-jose/v4 4.1.9,
+  golang.org/x/oauth2 0.38.0, modernc.org/sqlite 1.62.0, modernc.org/libc
+  1.80.1. Web: @sveltejs/kit 3.2.0, @tailwindcss/vite 4.3.5, tailwindcss
+  4.3.5, vite 8.3.8.
 
 ## [0.4.2] - 2026-11-08
 
