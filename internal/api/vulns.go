@@ -78,7 +78,17 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 	if img != nil {
 		d.HiddenFindings = uv.hiddenIn(index.Target{Kind: index.TargetImage, Image: img.Name})
 		// Not nil when all are hidden: the UI tells "none" from "no report".
-		d.Vulnerabilities = append([]reports.Vulnerability{}, img.Vulns()...)
+		d.Vulnerabilities = []reports.Vulnerability{}
+		// A report can list the same finding twice (two binaries with the
+		// same Go module, no package path): show it once, as the lists do.
+		dup := map[string]bool{}
+		for _, v := range img.Vulns() {
+			k := v.ID + "|" + v.Resource + "|" + v.InstalledVersion + "|" + v.Target
+			if !dup[k] {
+				dup[k] = true
+				d.Vulnerabilities = append(d.Vulnerabilities, v)
+			}
+		}
 		slices.SortStableFunc(d.Vulnerabilities, func(a, b reports.Vulnerability) int {
 			return cmp.Or(cmp.Compare(reports.SeverityRank(a.Severity), reports.SeverityRank(b.Severity)),
 				cmp.Compare(scoreOf(b.Score), scoreOf(a.Score)), cmp.Compare(a.Resource, b.Resource), cmp.Compare(a.ID, b.ID),

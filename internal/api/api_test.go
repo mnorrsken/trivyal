@@ -205,6 +205,10 @@ func TestDetails(t *testing.T) {
 		t.Errorf("image detail: %d vulns, %d secrets, sbom %v", len(img.Vulnerabilities), len(img.Secrets), img.SBOM != nil)
 	}
 	get(t, srv, "/api/v1/image?key=sha256:none", http.StatusNotFound, nil)
+	get(t, srv, "/api/v1/image?key=sha256:ddd", http.StatusOK, &img)
+	if len(img.Vulnerabilities) != 1 {
+		t.Errorf("duplicate finding: %d vulns, want 1", len(img.Vulnerabilities))
+	}
 
 	var cve CVEDetail
 	get(t, srv, "/api/v1/cve/CVE-2024-0001", http.StatusOK, &cve)

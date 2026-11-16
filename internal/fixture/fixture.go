@@ -148,8 +148,10 @@ func New(t testing.TB) *Source {
 		add(reports.VulnerabilityReports, vulnReport("shop", "pod-"+pod+"-postgres", "Pod", pod, "postgres", "shop/db", "16", "sha256:ccc",
 			vuln("CVE-2024-0004", "MEDIUM", "libpq", "16.0", "16.1")))
 	}
+	// The same finding twice, as trivy-operator writes it for two binaries
+	// with the same Go module.
 	add(reports.VulnerabilityReports, vulnReport("kube-system", "pod-etcd-node-a-etcd", "Pod", "etcd-node-a", "etcd", "etcd", "3.5", "sha256:ddd",
-		vuln("CVE-2024-0005", "LOW", "etcd", "3.5.0", "")))
+		vuln("CVE-2024-0005", "LOW", "etcd", "3.5.0", ""), vuln("CVE-2024-0005", "LOW", "etcd", "3.5.0", "")))
 
 	add(reports.ConfigAuditReports, checkReport("ConfigAuditReport", "shop", "replicaset-web-new", "ReplicaSet", "web-new",
 		// Same check for two containers: two findings.
