@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Headings use
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-16
+
+### Fixed
+
+- The image page no longer fails with a 500 error when a report lists the
+  same vulnerability twice (for example the same Go module in two binaries,
+  with no target). Each finding is now shown once, like in the vulnerability
+  lists.
+
 ## [0.4.3] - 2026-11-14
 
 ### Changed
